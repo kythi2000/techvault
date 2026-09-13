@@ -1,0 +1,6 @@
+@TechVault.Api_HostAddress = http://localhost:5078
+
+GET {{TechVault.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

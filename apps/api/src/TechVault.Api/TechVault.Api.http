@@ -16,3 +16,70 @@ GET {{TechVault.Api_HostAddress}}/health/ready
 Accept: text/plain
 
 ###
+
+# Public catalog requires the Phase 3 migration; seed explicitly to load Nokia 3310.
+# Default sort: release-desc, page=1, pageSize=24. Published devices only.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/nokia-3310
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/nokia-3310/specifications
+Accept: application/json
+
+###
+
+# All filters combine with AND; category includes descendants.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices?brand=nokia&category=feature-phones&type=phones&year=2000&fromYear=1990&toYear=2009&decade=2000&sort=name-asc&page=1&pageSize=24
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/phones?brand=nokia&decade=2000&sort=release-asc
+Accept: application/json
+
+###
+
+# HTTP 200 with empty data for the current Nokia-only seed.
+GET {{TechVault.Api_HostAddress}}/api/v1/computers
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/brands?page=1&pageSize=24
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/brands/nokia
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/categories?page=1&pageSize=24
+Accept: application/json
+
+###
+
+# HTTP 404, DEVICE_NOT_FOUND; unpublished slugs behave identically.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/missing-device
+Accept: application/json
+
+###
+
+# HTTP 400, VALIDATION_ERROR. pageSize must be 1..100.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices?pageSize=101
+Accept: application/json
+
+###
+
+# Malformed numeric input also returns the standard JSON 400 envelope.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices?page=abc
+Accept: application/json
+
+###

@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using TechVault.Api.Endpoints;
+using TechVault.Api.Middleware;
+using TechVault.Application;
 using TechVault.Application.Common.Abstractions;
 using TechVault.Infrastructure;
 using TechVault.Infrastructure.Persistence.Seed;
@@ -6,6 +9,8 @@ using TechVault.Infrastructure.Persistence.Seed;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -26,6 +31,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseMiddleware<ApiErrorHandlingMiddleware>();
+app.MapPublicCatalog();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
 app.MapHealthChecks("/health/ready", new HealthCheckOptions

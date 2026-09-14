@@ -1,6 +1,6 @@
 # TechVault
 
-A phone and computer catalog backend built with .NET 10. The current implementation covers Phases 1–3 in [the backend roadmap](docs/BACKEND_ROADMAP.md): the API foundation, PostgreSQL/EF Core, and storage for one complete Nokia 3310 record. Public catalog endpoints begin in Phase 4.
+A phone and computer catalog backend built with .NET 10. The current implementation covers Phases 1–4 in [the backend roadmap](docs/BACKEND_ROADMAP.md): the API foundation, PostgreSQL/EF Core, storage for one complete Nokia 3310 record, and public catalog APIs. The next milestone is the four-device phone/computer dataset in Phase 5; it is not implemented yet.
 
 ## Local build and run
 
@@ -41,7 +41,7 @@ The API does not connect to PostgreSQL until a database operation or readiness c
 
 ## Tests
 
-Domain tests do not require Docker:
+Domain and Application contract/validation tests do not require Docker:
 
 ```sh
 dotnet test apps/api/tests/TechVault.UnitTests/TechVault.UnitTests.csproj
@@ -53,7 +53,7 @@ With Docker running, execute the complete suite:
 dotnet test apps/api/TechVault.slnx
 ```
 
-Integration tests use Testcontainers to create disposable PostgreSQL containers with random ports and credentials; they do not use the Compose database or your `DATABASE_URL`. They verify connectivity/outages, no automatic schema creation, migration up/down, catalog round-trips, constraints, and preservation of editorial changes across repeated seeds. The first run downloads the container images. If a Debug API process locks build output on Windows, stop it or add `-c Release` to the build/test commands.
+Integration tests use Testcontainers to create disposable PostgreSQL containers with random ports and credentials; they do not use the Compose database or your `DATABASE_URL`. They verify connectivity/outages, no automatic schema creation, migration up/down, catalog round-trips, constraints, preservation of editorial changes across repeated seeds, and the public API contracts. API tests cover combined filters, deterministic pagination, typed specifications, unpublished visibility, and JSON errors in Production. Additional synthetic records exist only in test fixtures, not in the sample seed. The first run downloads the container images. If a Debug API process locks build output on Windows, stop it or add `-c Release` to the build/test commands.
 
 To verify the running API manually, request both health endpoints, run `docker compose stop postgres`, and request them again: readiness should be 503 and liveness should stay 200. Run `docker compose up -d postgres --wait` to restore PostgreSQL and verify readiness returns to 200. `docker compose down` stops/removes the development container but preserves the named volume; avoid `down -v` unless you intend to delete the local database.
 
@@ -109,4 +109,21 @@ Check that mappings and the migration snapshot remain aligned:
 dotnet ef migrations has-pending-model-changes --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
 ```
 
-There are no public catalog endpoints in Phase 3; `/api/v1/devices/nokia-3310` still returns 404. Inspect the seeded database through EF/tests or your PostgreSQL client until Phase 4.
+## Phase 4: public catalog APIs
+
+After explicitly migrating/seeding and starting the API, try:
+
+```sh
+curl -i http://localhost:5078/api/v1/devices/nokia-3310
+curl -i http://localhost:5078/api/v1/devices/nokia-3310/specifications
+curl -i "http://localhost:5078/api/v1/phones?brand=nokia&decade=2000&page=1&pageSize=24"
+curl -i http://localhost:5078/api/v1/computers
+curl -i http://localhost:5078/api/v1/brands/nokia
+curl -i http://localhost:5078/api/v1/categories
+```
+
+On Windows PowerShell, use `curl.exe` to invoke curl rather than the `Invoke-WebRequest` alias. All eight endpoint examples are also in [TechVault.Api.http](apps/api/src/TechVault.Api/TechVault.Api.http); see [the public catalog contract](docs/api/PUBLIC_CATALOG.md) for responses, filters, sorting, and pagination limits.
+
+Only Published devices are public. Unknown and unpublished device slugs return the same JSON 404. `/computers` returns HTTP 200 with an empty list for the current Nokia-only seed. Lists return `{ "data": [], "pagination": { ... } }`; detail returns `{ "data": { ... } }`. API responses carry `X-Trace-Id`, and JSON errors include the same `error.traceId`.
+
+The API delegates to concrete Application query handlers; EF queries project DTOs without tracking entities. Small `Result<T>`/pagination contracts support these actual use cases. No MediatR, repository, Unit of Work, extra package, schema change, or migration was introduced. Search, timeline, comparison, admin writes, and caching remain future phases.

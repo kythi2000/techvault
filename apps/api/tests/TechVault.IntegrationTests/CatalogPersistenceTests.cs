@@ -297,7 +297,7 @@ public sealed class CatalogPersistenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Migrated_catalog_keeps_health_working_without_exposing_public_catalog_endpoints()
+    public async Task Migrated_catalog_keeps_health_working_with_public_catalog_endpoints()
     {
         await SeedAsync();
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -312,7 +312,7 @@ public sealed class CatalogPersistenceTests : IAsyncLifetime
         using var catalog = await client.GetAsync("/api/v1/devices/nokia-3310", CancellationToken);
         Assert.Equal(HttpStatusCode.OK, live.StatusCode);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, catalog.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, catalog.StatusCode);
     }
 
     private TechVaultDbContext CreateContext() => new(new DbContextOptionsBuilder<TechVaultDbContext>()

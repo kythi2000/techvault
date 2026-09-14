@@ -16,6 +16,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/TechVault.Application/TechVault.Application.csproj" />
     <ProjectReference Include="../../src/TechVault.Domain/TechVault.Domain.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>

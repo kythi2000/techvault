@@ -1,6 +1,18 @@
 @TechVault.Api_HostAddress = http://localhost:5078
 
-GET {{TechVault.Api_HostAddress}}/weatherforecast/
+GET {{TechVault.Api_HostAddress}}/health/live
 Accept: application/json
+
+###
+
+# Available only in Development.
+GET {{TechVault.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+
+# Returns 200 Healthy when PostgreSQL is reachable, otherwise 503 Unhealthy.
+GET {{TechVault.Api_HostAddress}}/health/ready
+Accept: text/plain
 
 ###

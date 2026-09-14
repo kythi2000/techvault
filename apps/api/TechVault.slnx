@@ -1,2 +1,8 @@
 <Solution>
+  <Project Path="src/TechVault.Api/TechVault.Api.csproj" />
+  <Project Path="src/TechVault.Application/TechVault.Application.csproj" />
+  <Project Path="src/TechVault.Domain/TechVault.Domain.csproj" />
+  <Project Path="src/TechVault.Infrastructure/TechVault.Infrastructure.csproj" />
+  <Project Path="tests/TechVault.IntegrationTests/TechVault.IntegrationTests.csproj" />
+  <Project Path="tests/TechVault.UnitTests/TechVault.UnitTests.csproj" />
 </Solution>

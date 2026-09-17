@@ -1,6 +1,18 @@
 # TechVault
 
-A phone and computer catalog backend built with .NET 10. The current implementation covers Phases 1–4 in [the backend roadmap](docs/BACKEND_ROADMAP.md): the API foundation, PostgreSQL/EF Core, storage for one complete Nokia 3310 record, and public catalog APIs. The next milestone is the four-device phone/computer dataset in Phase 5; it is not implemented yet.
+A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–4 in [the backend roadmap](docs/BACKEND_ROADMAP.md). The Next.js app covers Frontend Phases 1–4 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, the device detail/specification vertical slice, and brand/category taxonomy pages.
+
+## Frontend
+
+The public web app lives in `apps/web` and consumes the API from Server Components. Start the migrated/seeded API as described below, then in another terminal run:
+
+```powershell
+cd apps/web
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. `TECHVAULT_API_URL` defaults to `http://localhost:5078`; see [the web README](apps/web/README.md) for configuration and quality checks. When the catalog API is unavailable, the public shell still renders and data surfaces show an explicit unavailable state.
 
 ## Local build and run
 

@@ -106,6 +106,34 @@ namespace TechVault.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TechVault.Domain.Comparisons.ComparisonGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("ComparisonGroups", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ComparisonGroups_Key", "\"Key\" ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)*$'");
+
+                            t.HasCheckConstraint("CK_ComparisonGroups_Name", "length(btrim(\"Name\")) > 0");
+                        });
+                });
+
             modelBuilder.Entity("TechVault.Domain.Devices.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -115,6 +143,9 @@ namespace TechVault.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ComparisonGroupId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -208,6 +239,8 @@ namespace TechVault.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CategoryId");
 
+                    b.HasIndex("ComparisonGroupId");
+
                     b.HasIndex("SearchVector");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "GIN");
@@ -290,6 +323,11 @@ namespace TechVault.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsComparable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Key")
                         .IsRequired()
@@ -381,9 +419,16 @@ namespace TechVault.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TechVault.Domain.Comparisons.ComparisonGroup", "ComparisonGroup")
+                        .WithMany()
+                        .HasForeignKey("ComparisonGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Brand");
 
                     b.Navigation("Category");
+
+                    b.Navigation("ComparisonGroup");
                 });
 
             modelBuilder.Entity("TechVault.Domain.Specifications.DeviceSpecification", b =>

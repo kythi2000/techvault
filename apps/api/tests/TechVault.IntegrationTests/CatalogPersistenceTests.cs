@@ -71,16 +71,17 @@ public sealed class CatalogPersistenceTests : IAsyncLifetime
         Assert.Equal(new DateOnly(2000, 9, 1), device.Specifications.Single(x => x.Definition.Key == "announcement_date").ValueDate);
         Assert.Collection(await db.Database.GetAppliedMigrationsAsync(CancellationToken),
             migration => Assert.EndsWith("_InitialCatalog", migration),
-            migration => Assert.EndsWith("_AddCatalogDiscovery", migration));
+            migration => Assert.EndsWith("_AddCatalogDiscovery", migration),
+            migration => Assert.EndsWith("_AddCatalogComparisons", migration));
         Assert.Empty(await db.Database.GetPendingMigrationsAsync(CancellationToken));
         Assert.False(db.Database.HasPendingModelChanges());
         Assert.Null(db.Model.FindEntityType(typeof(BaseEntity)));
-        Assert.Equal(6, db.Model.GetEntityTypes().Count());
+        Assert.Equal(7, db.Model.GetEntityTypes().Count());
         Assert.All(db.Model.GetEntityTypes(), entity => Assert.Null(entity.BaseType));
 
         var tables = await db.Database.SqlQuery<string>($"SELECT tablename AS \"Value\" FROM pg_tables WHERE schemaname = 'public'")
             .OrderBy(x => x).ToListAsync(CancellationToken);
-        Assert.Equal(new[] { "Brands", "Categories", "DeviceSpecifications", "Devices", "SpecificationDefinitions",
+        Assert.Equal(new[] { "Brands", "Categories", "ComparisonGroups", "DeviceSpecifications", "Devices", "SpecificationDefinitions",
             "SpecificationGroups", "__EFMigrationsHistory" }, tables);
     }
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TechVault.Application.Common.Abstractions;
 using TechVault.Domain.Brands;
 using TechVault.Domain.Categories;
+using TechVault.Domain.Comparisons;
 using TechVault.Domain.Devices;
 using TechVault.Domain.Specifications;
 
@@ -11,6 +12,15 @@ namespace TechVault.Infrastructure.Persistence.Seed;
 // This is not an upsert/synchronization service; it never changes stored reference metadata.
 internal sealed class CatalogSeedReferences(ITechVaultDbContext db, CancellationToken cancellationToken)
 {
+    public async Task<ComparisonGroup> ComparisonGroupAsync(string name, string key)
+    {
+        var group = await db.ComparisonGroups.SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
+        if (group is not null) return group;
+        group = new ComparisonGroup(name, key);
+        db.ComparisonGroups.Add(group);
+        return group;
+    }
+
     public async Task<Brand> BrandAsync(string name, string slug, string description)
     {
         var brand = await db.Brands.SingleOrDefaultAsync(x => x.Slug == slug, cancellationToken);
@@ -46,12 +56,12 @@ internal sealed class CatalogSeedReferences(ITechVaultDbContext db, Cancellation
     }
 
     public async Task SpecificationAsync(Device device, SpecificationGroup group, string name, string key,
-        int order, SpecificationValue value, string? unit = null)
+        int order, SpecificationValue value, string? unit = null, bool isComparable = true)
     {
         var definition = await db.SpecificationDefinitions.SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
         if (definition is null)
         {
-            definition = new SpecificationDefinition(name, key, group, value.DataType, order, unit);
+            definition = new SpecificationDefinition(name, key, group, value.DataType, order, unit, isComparable);
             db.SpecificationDefinitions.Add(definition);
         }
         else if (definition.DataType != value.DataType || definition.Unit != unit)

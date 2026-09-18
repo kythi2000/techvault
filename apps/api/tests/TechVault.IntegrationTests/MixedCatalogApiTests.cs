@@ -122,11 +122,12 @@ public sealed class MixedCatalogApiTests(MixedCatalogFixture fixture) : IClassFi
             Assert.NotEmpty(x.ShortDescription);
         });
         await using var db = fixture.CreateContext();
-        Assert.Equal(6, db.Model.GetEntityTypes().Count());
+        Assert.Equal(7, db.Model.GetEntityTypes().Count());
         Assert.False(db.Database.HasPendingModelChanges());
         Assert.Collection(await db.Database.GetAppliedMigrationsAsync(Ct),
             migration => Assert.EndsWith("_InitialCatalog", migration),
-            migration => Assert.EndsWith("_AddCatalogDiscovery", migration));
+            migration => Assert.EndsWith("_AddCatalogDiscovery", migration),
+            migration => Assert.EndsWith("_AddCatalogComparisons", migration));
         Assert.Equal(4, await db.Devices.CountAsync(x => x.Status == DeviceStatus.Published, Ct));
         Assert.Equal(10, await db.SpecificationGroups.CountAsync(Ct));
         Assert.Equal(29, await db.SpecificationDefinitions.CountAsync(Ct));

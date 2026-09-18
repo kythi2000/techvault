@@ -1,6 +1,7 @@
 using TechVault.Domain.Brands;
 using TechVault.Domain.Categories;
 using TechVault.Domain.Common;
+using TechVault.Domain.Comparisons;
 using TechVault.Domain.Specifications;
 
 namespace TechVault.Domain.Devices;
@@ -32,6 +33,8 @@ public sealed class Device : BaseEntity
     public Brand Brand { get; private set; } = null!;
     public Guid CategoryId { get; private set; }
     public Category Category { get; private set; } = null!;
+    public Guid? ComparisonGroupId { get; private set; }
+    public ComparisonGroup? ComparisonGroup { get; private set; }
     public string ShortDescription { get; private set; } = "";
     public string Description { get; private set; } = "";
     public string History { get; private set; } = "";
@@ -49,6 +52,71 @@ public sealed class Device : BaseEntity
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PublishedAt { get; private set; }
     public IReadOnlyCollection<DeviceSpecification> Specifications => _specifications.AsReadOnly();
+
+    public void UpdateIdentity(string name, string slug, Brand brand, Category category)
+    {
+        name = CatalogRules.Required(name, 200, nameof(name));
+        slug = CatalogRules.Slug(slug);
+        ArgumentNullException.ThrowIfNull(brand);
+        ArgumentNullException.ThrowIfNull(category);
+        Name = name;
+        Slug = slug;
+        Brand = brand;
+        BrandId = brand.Id;
+        Category = category;
+        CategoryId = category.Id;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void UpdateDraftContent(string shortDescription, string description, string history, string seoTitle, string seoDescription)
+    {
+        if (Status != DeviceStatus.Draft) throw new InvalidOperationException("Only drafts may have incomplete content.");
+        shortDescription = CatalogRules.Text(shortDescription, 500, nameof(shortDescription));
+        description = CatalogRules.Text(description, 100_000, nameof(description));
+        history = CatalogRules.Text(history, 100_000, nameof(history));
+        seoTitle = CatalogRules.Text(seoTitle, 200, nameof(seoTitle));
+        seoDescription = CatalogRules.Text(seoDescription, 500, nameof(seoDescription));
+        ShortDescription = shortDescription;
+        Description = description;
+        History = history;
+        SeoTitle = seoTitle;
+        SeoDescription = seoDescription;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public bool RemoveSpecification(Guid definitionId)
+    {
+        var specification = _specifications.SingleOrDefault(x => x.DefinitionId == definitionId);
+        if (specification is null) return false;
+        _specifications.Remove(specification);
+        UpdatedAt = DateTimeOffset.UtcNow;
+        return true;
+    }
+
+    public void Unpublish()
+    {
+        if (Status == DeviceStatus.Archived) throw new InvalidOperationException("Archived devices cannot be unpublished.");
+        if (Status == DeviceStatus.Draft) return;
+        Status = DeviceStatus.Draft;
+        PublishedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Archive()
+    {
+        if (Status == DeviceStatus.Archived) return;
+        Status = DeviceStatus.Archived;
+        PublishedAt = null;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void SetComparisonGroup(ComparisonGroup? group)
+    {
+        if (ComparisonGroupId == group?.Id) return;
+        ComparisonGroup = group;
+        ComparisonGroupId = group?.Id;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 
     public void SetSearchMetadata(string? modelNumber, IEnumerable<string> aliases)
     {

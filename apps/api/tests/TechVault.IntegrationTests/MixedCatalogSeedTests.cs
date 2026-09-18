@@ -196,7 +196,7 @@ public sealed class MixedCatalogSeedTests
     {
         var rows = new List<string>();
         // Only these fixed test table names are interpolated; no request/user input enters SQL.
-        foreach (var table in new[] { "Brands", "Categories", "Devices", "SpecificationGroups", "SpecificationDefinitions", "DeviceSpecifications" })
+        foreach (var table in new[] { "Brands", "Categories", "Devices", "ComparisonGroups", "SpecificationGroups", "SpecificationDefinitions", "DeviceSpecifications" })
         {
             var sql = $"SELECT to_jsonb(record)::text AS \"Value\" FROM \"{table}\" AS record";
             rows.AddRange((await db.Database.SqlQueryRaw<string>(sql).ToListAsync(Ct)).Select(row => table + ":" + row));

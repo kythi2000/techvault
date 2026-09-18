@@ -1,4 +1,6 @@
 using TechVault.Api.Responses;
+using TechVault.Application.Common.Results;
+using TechVault.Infrastructure.Persistence;
 
 namespace TechVault.Api.Middleware;
 
@@ -34,9 +36,14 @@ public sealed class ApiErrorHandlingMiddleware(RequestDelegate next, ILogger<Api
         {
             await WriteErrorAsync(context, 400, "VALIDATION_ERROR", "Invalid request parameters.", traceId);
         }
+        catch (Exception exception) when (!context.Response.HasStarted &&
+            context.Request.Path.StartsWithSegments("/api/v1/admin") && CatalogPersistenceErrors.Classify(exception) is { } error)
+        {
+            await WriteErrorAsync(context, error.Type == ErrorType.Conflict ? 409 : 400, error.Code, error.Message, traceId);
+        }
         catch (Exception exception) when (!context.Response.HasStarted)
         {
-            logger.LogError(exception, "Public catalog request failed. TraceId: {TraceId}", traceId);
+            logger.LogError(exception, "Catalog request failed. TraceId: {TraceId}", traceId);
             await WriteErrorAsync(context, 500, "UNEXPECTED_ERROR", "An unexpected error occurred.", traceId);
         }
     }

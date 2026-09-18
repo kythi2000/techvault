@@ -97,7 +97,7 @@ public sealed class DiscoveryDatabaseTests(ITestOutputHelper output)
     }
 
     private static Task<List<string>> EditorialRowsAsync(TechVaultDbContext db) => db.Database.SqlQuery<string>($"""
-        SELECT (to_jsonb(d) - 'Aliases' - 'ModelNumber' - 'SearchVector')::text AS "Value" FROM "Devices" d
+        SELECT (to_jsonb(d) - 'Aliases' - 'ModelNumber' - 'SearchVector' - 'ComparisonGroupId')::text AS "Value" FROM "Devices" d
         """).OrderBy(x => x).ToListAsync(Ct);
 
     private static async Task<string> ExplainAsync(TechVaultDbContext db, string sql)

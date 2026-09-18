@@ -1,6 +1,6 @@
 namespace TechVault.Application.Common.Results;
 
-public enum ErrorType { Validation, NotFound }
+public enum ErrorType { Validation, NotFound, Conflict }
 
 public sealed record Error(string Code, string Message, ErrorType Type)
 {

@@ -234,7 +234,7 @@ public sealed class PublicCatalogApiTests(PublicCatalogFixture fixture) : IClass
     }
 
     [Fact]
-    public async Task OpenApi_describes_all_ten_routes_in_development_only()
+    public async Task OpenApi_describes_all_eleven_routes_in_development_only()
     {
         using var production = await fixture.Client.GetAsync("/openapi/v1.json", Ct);
         Assert.Equal(HttpStatusCode.NotFound, production.StatusCode);
@@ -244,7 +244,7 @@ public sealed class PublicCatalogApiTests(PublicCatalogFixture fixture) : IClass
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         foreach (var path in new[] { "/devices", "/devices/{slug}", "/devices/{slug}/specifications",
-            "/phones", "/computers", "/brands", "/brands/{slug}", "/categories", "/search", "/timeline" })
+            "/phones", "/computers", "/brands", "/brands/{slug}", "/categories", "/search", "/timeline", "/compare" })
         {
             var responses = document.RootElement.GetProperty("paths").GetProperty("/api/v1" + path)
                 .GetProperty("get").GetProperty("responses");

@@ -1,6 +1,6 @@
 # TechVault
 
-A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–6 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, and a chronological timeline. The Next.js app covers Frontend Phases 1–5 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, device detail/specifications, taxonomy pages, search, and a responsive timeline.
+A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–8 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, a chronological timeline, two-device comparisons, and protected content management. The Next.js app covers Frontend Phases 1–5 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, device detail/specifications, taxonomy pages, search, and a responsive timeline.
 
 ## Frontend
 
@@ -111,12 +111,12 @@ On a fresh database, the sample contains two Nokia feature phones and two Apple 
 Model conventions:
 
 - Domain has no EF Core/ASP.NET dependency. Infrastructure implements Application's `ITechVaultDbContext` using the existing scoped EF context.
-- `Common/BaseEntity` shares only the application-generated `Guid Id` for Brand, Category, Device, SpecificationGroup, and SpecificationDefinition. IDs have no public setter; existing audit fields remain on Brand/Device. DeviceSpecification retains its `(DeviceId, DefinitionId)` composite key and does not inherit BaseEntity.
+- `Common/BaseEntity` shares only the application-generated `Guid Id` for Brand, Category, Device, SpecificationGroup, SpecificationDefinition, and ComparisonGroup. IDs have no public setter; existing audit fields remain on Brand/Device. DeviceSpecification retains its `(DeviceId, DefinitionId)` composite key and does not inherit BaseEntity.
 - BaseEntity is a small, non-generic CLR base class, not an EF entity/table or a persistence inheritance hierarchy. This refactor does not change the schema or require a migration; do not add a `DbSet<BaseEntity>`, generic repository, automatic auditing, soft-delete flags, or domain events to it.
-- Specification definitions are shared by key; only values assigned to a device are stored. No separate phone/computer tables or comparison groups exist.
+- Specification definitions are shared by key; only values assigned to a device are stored. No separate phone/computer tables exist. Phase 7 adds explicit comparison groups and opt-in `IsComparable` definition metadata.
 - A missing specification means unknown; `false` and `0` are real values. Each stored value has exactly one typed column, and its type must match the definition.
 - Read specifications in group display order, then definition display order, then key for stable ties. Load a device's specifications before calling `SetSpecification` to edit it.
-- Category parents are assigned at creation. Reparenting and protected editorial endpoints are later-phase work.
+- Category parents are assigned at creation and cannot be changed through the admin API. Protected editorial endpoints are described in Phase 8 below.
 
 Check that mappings and the migration snapshot remain aligned:
 
@@ -141,7 +141,7 @@ On Windows PowerShell, use `curl.exe` to invoke curl rather than the `Invoke-Web
 
 Only Published devices are public. Unknown and unpublished device slugs return the same JSON 404. Lists return `{ "data": [], "pagination": { ... } }`; detail returns `{ "data": { ... } }`. API responses carry `X-Trace-Id`, and JSON errors include the same `error.traceId`.
 
-The API delegates to concrete Application query handlers; EF queries project DTOs without tracking entities. Small `Result<T>`/pagination contracts support these actual use cases. Phase 4 introduced no MediatR, repository, Unit of Work, extra package, schema change, or migration. Search/timeline are now implemented in Phase 6 below; comparison, admin writes, and caching remain future work.
+The API delegates to concrete Application query handlers; EF queries project DTOs without tracking entities. Small `Result<T>`/pagination contracts support these actual use cases. Phase 4 introduced no MediatR, repository, Unit of Work, extra package, schema change, or migration. Search/timeline, comparison, and admin writes are implemented in Phases 6–8 below; caching remains deferred.
 
 ## Phase 5: two phones + two computers
 
@@ -152,7 +152,7 @@ dotnet run --project apps/api/src/TechVault.Api --launch-profile http -- --seed-
 dotnet run --project apps/api/src/TechVault.Api --launch-profile http
 ```
 
-On an unedited four-device dataset, `/phones` returns two devices and `/computers` returns two. Both computers belong to `Computers → All-in-One Computers`; no laptop, comparison-group, or relationship data is introduced. Try:
+On an unedited four-device dataset, `/phones` returns two devices and `/computers` returns two. Both computers belong to `Computers → All-in-One Computers`; Phase 5 introduced no laptop, comparison-group, or relationship data. Try:
 
 ```sh
 curl -i http://localhost:5078/api/v1/devices/nokia-3210
@@ -186,10 +186,58 @@ curl -i "http://localhost:5078/api/v1/timeline?type=computers&brand=apple&fromYe
 
 Both endpoints return the existing paginated device cards and only published devices. Search matches name, aliases, model number, brand name, short description, and description. It uses plain whole-word matching, not substring/fuzzy search; timeline sorts oldest first and omits devices without a known release year. See [the API contract](docs/api/PUBLIC_CATALOG.md) for ranking, era/date semantics, and bounds.
 
-No new package, separate service, comparison model, or admin endpoint is added. A feature-specific `IDeviceSearch` lets Infrastructure own PostgreSQL full-text details; Domain remains persistence-independent. Integration tests verify edits, visibility, migration backfill/down/up, and query plans on 8,000 disposable test records. Run the plan check with its output visible:
+Phase 6 added no new package, separate service, comparison model, or admin endpoint. A feature-specific `IDeviceSearch` lets Infrastructure own PostgreSQL full-text details; Domain remains persistence-independent. Integration tests verify edits, visibility, migration backfill/down/up, and query plans on 8,000 disposable test records. Run the plan check with its output visible:
 
 ```sh
 dotnet test apps/api/tests/TechVault.IntegrationTests/TechVault.IntegrationTests.csproj --filter FullyQualifiedName~Representative_search_and_chronology_queries_use_their_indexes --logger "console;verbosity=detailed"
 ```
 
 The plan fixture runs `VACUUM (ANALYZE)` after bulk loading to flush the [GIN pending list](https://www.postgresql.org/docs/17/gin.html#GIN-FAST-UPDATE) and refresh statistics; it never disables sequential scans. A four-device catalog can legitimately use sequential scans. There is no additional application-managed vacuum job or catalog expansion in this phase. Reverting the discovery migration drops alias/model metadata, so use rollback only on disposable databases or after a reviewed backup; the implementation tests never migrate your local database.
+
+## Phase 7: compare compatible devices
+
+Apply all migrations, including `AddCatalogComparisons`, before running the current API or seed. For an existing Phase 6 database, stop the API, verify `DATABASE_URL`, review the upgrade SQL, then explicitly apply it:
+
+```sh
+dotnet ef migrations script AddCatalogDiscovery AddCatalogComparisons --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
+dotnet ef database update --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
+dotnet run --project apps/api/src/TechVault.Api --launch-profile http
+```
+
+Append `-- --environment Development` to EF commands if using `appsettings.Development.json` instead of a terminal environment variable. No startup migration or seed is added. The migration initializes new comparison metadata for the four known samples when their brand/category still matches the seed classification, without changing existing editorial fields, status, timestamps, or specification values. It opts the 28 technical sample definitions into comparison; `announcement_date` and unknown definitions stay opted out. Existing matching samples need no seed rerun. Reclassified/other records remain unassigned and fail closed until explicitly reviewed; reseeding does not repair them.
+
+```sh
+curl -i "http://localhost:5078/api/v1/compare?devices=nokia-3310,nokia-3210"
+curl -i "http://localhost:5078/api/v1/compare?devices=macintosh-128k,imac-g3&differencesOnly=true"
+```
+
+`devices` requires exactly two distinct lowercase slugs, in the desired column order. Both must be Published and assigned to the same explicit comparison group. Missing values remain missing, not zero/false; no winner, scoring, unit conversion, or device-specific strategy is introduced. See [comparison contract and migration notes](docs/api/COMPARISON.md) for errors, equality rules, and the response.
+
+Run the normal build/test commands or focus on this capability with `dotnet test apps/api/TechVault.slnx --filter FullyQualifiedName~Comparison`. Tests use isolated PostgreSQL containers and cover both real pairs, typed values, visibility/metadata changes, non-overwriting reseeds, foreign keys, and migration upgrade/down/up. A schema rollback drops the new group assignments and comparability flags; do not use it on a valuable database without a reviewed backup.
+
+## Phase 8: protected content management
+
+The `/api/v1/admin` endpoints manage devices, typed specifications, brands, categories, specification groups/definitions, and publication state. `DELETE /api/v1/admin/devices/{id}` archives the device; it never deletes editorial content or specifications. All admin reads and writes require one securely configured API key in `Authorization: Bearer <key>`. Public catalog and health endpoints remain unauthenticated.
+
+Set `Admin__ApiKey` in the API process environment (equivalent configuration key: `Admin:ApiKey`). Missing/invalid configuration disables admin access with 401; there is no default credential. `.env` is not automatically loaded by `dotnet run`. Generate a random local key without printing or committing it, then launch the API from the same PowerShell session with `DATABASE_URL` already configured:
+
+```powershell
+$adminKeyBytes = New-Object byte[] 32
+$adminRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$adminRng.GetBytes($adminKeyBytes)
+$adminRng.Dispose()
+$env:Admin__ApiKey = [Convert]::ToBase64String($adminKeyBytes)
+dotnet run --project apps/api/src/TechVault.Api --launch-profile http
+```
+
+Keep the key in a private secret store if it must survive this session. A trusted client must use the same key; generating another key in a second terminal will not authenticate against the running process. Use HTTPS outside loopback development, never query-string credentials or a public frontend bundle. Rotate by replacing the configured key and restarting the API. See [the admin API contract](docs/api/ADMIN.md) for setup, request bodies, lifecycle rules, and errors; [TechVault.Admin.http](apps/api/src/TechVault.Api/TechVault.Admin.http) contains examples using a private client variable.
+
+Phase 8 adds FluentValidation with manual validation in concrete Application handlers and domain methods for editing/lifecycle rules. It reuses the current schema: no new migration, account table, JWT server, repository, Unit of Work, MediatR, media pipeline, or admin UI. Apply existing migrations through `AddCatalogComparisons` explicitly if your database is behind; startup still never migrates or seeds. PUT replaces the documented content fields; use GET to load the current content before editing. Writes are immediate and intended for one trusted editor, not a multi-user approval/versioning workflow.
+
+```sh
+dotnet build apps/api/TechVault.slnx
+dotnet test apps/api/TechVault.slnx --filter FullyQualifiedName~Admin
+dotnet test apps/api/TechVault.slnx
+```
+
+Admin tests use disposable PostgreSQL containers and generated test-only keys. They cover every route's authorization, editorial lifecycle/public visibility, all four specification types, safe reference CRUD, semantic restrictions, duplicate/racing writes, search updates, and unchanged schema. Production hardening and deployment remain Phases 9–10; this phase does not expose a production service.

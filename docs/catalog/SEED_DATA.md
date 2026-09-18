@@ -1,4 +1,4 @@
-# Four-device proof catalog — Phase 5
+# Four-device proof catalog — Phase 5, with Phase 7 comparison metadata
 
 The explicit `--seed-catalog` command uses the existing Device/typed-specification model and public read APIs. It inserts missing samples only; it is not an importer or editorial synchronization system. No schema or API contract changed in Phase 5.
 
@@ -11,9 +11,9 @@ The explicit `--seed-catalog` command uses the existing Device/typed-specificati
 | `macintosh-128k` | Original factory configuration, not a third-party RAM upgrade | Apple; Computers → All-in-One Computers | 1984-01-24 |
 | `imac-g3` | First 1998 233 MHz configuration, not later G3 revisions | Apple; Computers → All-in-One Computers | 1998-08-15 |
 
-Both computers use the same form-factor category, directly under `computers` as in SPEC. No unused desktop/laptop categories, parallel computer tables, compatibility groups, or family/relationship records are created. Classification alone does not pre-design the comparison rules for Phase 7.
+Both computers use the same form-factor category, directly under `computers` as in SPEC. No unused desktop/laptop categories, parallel computer tables, or family/relationship records are created. Phase 7 adds explicit `phone` and `all_in_one` comparison groups; compatibility is no longer deferred and is not inferred from category names at query time.
 
-On a fresh database the seed creates 4 Published devices, 2 brands, 4 categories, 10 specification groups, 29 shared definitions, and 44 device-specific values. These counts are fixture expectations, not enforced production limits. Existing editorial data can legitimately change public counts and content.
+On a fresh migrated/seeded database there are 4 Published devices, 2 brands, 4 categories, 2 comparison groups, 10 specification groups, 29 shared definitions, and 44 device-specific values. The 28 technical definitions are comparable; `announcement_date` is not. These counts are fixture expectations, not enforced production limits. Existing editorial data can legitimately change public counts and content.
 
 ## Sources and precision
 
@@ -49,7 +49,7 @@ The technical page includes some revision/upgrade alternatives. The seed uses th
 
 ## Seed behavior and upgrade path
 
-1. Verify `DATABASE_URL` targets the intended dedicated TechVault database. Apply the existing initial migration explicitly if needed; there is no Phase 5 migration.
+1. Verify `DATABASE_URL` targets the intended dedicated TechVault database. Apply all current migrations explicitly, including `AddCatalogComparisons`; there was no Phase 5 migration.
 2. Run `dotnet run --project apps/api/src/TechVault.Api --launch-profile http -- --seed-catalog` from the repository root.
 3. The command checks each device slug before loading its reference data. Existing devices are skipped wholesale, including Draft/Archived, reclassified, or partially populated records.
 4. Missing devices reuse existing references or stage the required missing references. Type/unit or category-parent conflicts fail explicitly; labels, descriptions, display order, and other editorial metadata are never reset.
@@ -58,6 +58,8 @@ The technical page includes some revision/upgrade alternatives. The seed uses th
 Run one seed process at a time. Do not catch a seed failure and reuse that failed DbContext for more saves: it may still track unsaved references. There is no concurrent-seed retry, upsert, reconciliation, automatic startup seed, or automatic migration. A deleted sample slug will be inserted again on the next explicit seed; deleting only a specification from an existing device does not restore it.
 
 For an existing Phase 3/4 database, this command adds only the three missing samples and their references. It never republishes or repairs Nokia 3310. The seed process exits after completion; run the API normally afterward. Local database mutation is an explicit operator step, not part of the automated test suite.
+
+Phase 7's migration, not the seed command, initializes new compatibility/comparability metadata for existing recognized samples. It does not change old editorial fields or values. Fresh inserts use those defaults; reseeding never reassigns an existing device or resets an editor's `IsComparable` selection or group label. See [comparison migration details](../api/COMPARISON.md#persistence-migration-and-seed-safety), including how reclassified records remain unassigned.
 
 ## Verification
 

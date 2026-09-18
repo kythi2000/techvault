@@ -1,6 +1,7 @@
 using TechVault.Domain.Brands;
 using TechVault.Domain.Categories;
 using TechVault.Domain.Common;
+using TechVault.Domain.Comparisons;
 using TechVault.Domain.Devices;
 using TechVault.Domain.Specifications;
 
@@ -16,7 +17,7 @@ public sealed class EntityIdentityTests
         var group = new SpecificationGroup("General", "general", 10);
         BaseEntity[] entities =
         [
-            brand, category, group,
+            brand, category, group, new ComparisonGroup("Phones", "phone"),
             new Device("Nokia 3310", "nokia-3310", brand, category),
             new SpecificationDefinition("SMS chat", "sms_chat", group, SpecificationDataType.Boolean, 10)
         ];

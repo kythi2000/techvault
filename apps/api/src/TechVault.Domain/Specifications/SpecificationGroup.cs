@@ -17,4 +17,12 @@ public sealed class SpecificationGroup : BaseEntity
     public string Name { get; private set; } = null!;
     public string Key { get; private set; } = null!;
     public int DisplayOrder { get; private set; }
+
+    public void UpdateDetails(string name, int displayOrder)
+    {
+        name = CatalogRules.Required(name, 200, nameof(name));
+        ArgumentOutOfRangeException.ThrowIfNegative(displayOrder);
+        Name = name;
+        DisplayOrder = displayOrder;
+    }
 }

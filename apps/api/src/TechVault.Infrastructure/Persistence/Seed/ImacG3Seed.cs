@@ -17,6 +17,7 @@ internal static class ImacG3Seed
         var allInOne = await references.CategoryAsync("All-in-One Computers", "all-in-one-computers", 10,
             "Computers with the display and main system integrated into one enclosure.", computers);
         var device = new Device("iMac G3", "imac-g3", apple, allInOne);
+        device.SetComparisonGroup(await references.ComparisonGroupAsync("All-in-One Computers", "all_in_one"));
         // The original 233 MHz 1998 configuration, not an aggregate of the entire G3 range.
         // Sources and omitted revision-dependent fields: docs/catalog/SEED_DATA.md.
         device.UpdateContent(
@@ -37,7 +38,7 @@ internal static class ImacG3Seed
         var ports = await references.GroupAsync("Ports", "ports", 45);
         var software = await references.GroupAsync("Software", "software", 50);
         await references.SpecificationAsync(device, general, "Announcement date", "announcement_date", 10,
-            SpecificationValue.Date(new DateOnly(1998, 5, 6)));
+            SpecificationValue.Date(new DateOnly(1998, 5, 6)), isComparable: false);
         await references.SpecificationAsync(device, processor, "Processor model", "cpu_model", 10,
             SpecificationValue.Text("PowerPC G3"));
         await references.SpecificationAsync(device, processor, "Processor clock", "cpu_clock", 20,

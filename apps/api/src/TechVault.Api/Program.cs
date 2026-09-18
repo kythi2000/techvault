@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using TechVault.Api.Endpoints;
+using TechVault.Api.Authentication;
 using TechVault.Api.Middleware;
 using TechVault.Application;
 using TechVault.Application.Common.Abstractions;
@@ -12,6 +13,7 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddAdminAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
@@ -33,7 +35,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ApiErrorHandlingMiddleware>();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapPublicCatalog();
+app.MapAdminCatalog();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
 app.MapHealthChecks("/health/ready", new HealthCheckOptions

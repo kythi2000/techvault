@@ -17,7 +17,7 @@ Accept: text/plain
 
 ###
 
-# Apply all migrations, including AddCatalogDiscovery; --seed-catalog loads the four Phase 5 samples.
+# Apply all migrations, including AddCatalogComparisons; --seed-catalog loads the four samples.
 # Default sort: release-desc, page=1, pageSize=24. Published devices only.
 GET {{TechVault.Api_HostAddress}}/api/v1/devices
 Accept: application/json
@@ -167,6 +167,35 @@ Accept: application/json
 
 # HTTP 400: era must use a decade label such as 1990s.
 GET {{TechVault.Api_HostAddress}}/api/v1/timeline?era=1991s
+Accept: application/json
+
+###
+
+# Exactly two Published, compatible device slugs; columns follow the requested order.
+GET {{TechVault.Api_HostAddress}}/api/v1/compare?devices=nokia-3310,nokia-3210
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/compare?devices=macintosh-128k,imac-g3&differencesOnly=true
+Accept: application/json
+
+###
+
+# Reversing the pair reverses its value columns, not the specification row order.
+GET {{TechVault.Api_HostAddress}}/api/v1/compare?devices=nokia-3210,nokia-3310&differencesOnly=true
+Accept: application/json
+
+###
+
+# HTTP 400, INCOMPATIBLE_DEVICES.
+GET {{TechVault.Api_HostAddress}}/api/v1/compare?devices=nokia-3310,imac-g3
+Accept: application/json
+
+###
+
+# HTTP 400, VALIDATION_ERROR: duplicate devices are not a comparison.
+GET {{TechVault.Api_HostAddress}}/api/v1/compare?devices=nokia-3310,nokia-3310
 Accept: application/json
 
 ###

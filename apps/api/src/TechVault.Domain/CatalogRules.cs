@@ -4,6 +4,15 @@ namespace TechVault.Domain;
 
 internal static class CatalogRules
 {
+    public static string Text(string value, int maxLength, string parameter)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameter);
+        value = value.Trim();
+        if (value.Length > maxLength)
+            throw new ArgumentException($"Must contain at most {maxLength} characters.", parameter);
+        return value;
+    }
+
     public static string Required(string value, int maxLength, string parameter)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value, parameter);

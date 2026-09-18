@@ -1,0 +1,80 @@
+# Configure AdminToken in your HTTP client's PRIVATE environment, never in this file.
+# It must match Admin__ApiKey in the API process. See docs/api/ADMIN.md.
+# Examples are local only; use HTTPS outside loopback. Never enable Authorization logging.
+@AdminHost = http://localhost:5078
+@DeviceId = 00000000-0000-0000-0000-000000000000
+@DefinitionId = 00000000-0000-0000-0000-000000000000
+
+### List drafts (all statuses when status is omitted)
+GET {{AdminHost}}/api/v1/admin/devices?status=draft&page=1&pageSize=24
+Authorization: Bearer {{AdminToken}}
+
+### Reference IDs for device editing
+GET {{AdminHost}}/api/v1/admin/brands
+Authorization: Bearer {{AdminToken}}
+
+###
+GET {{AdminHost}}/api/v1/admin/categories
+Authorization: Bearer {{AdminToken}}
+
+###
+GET {{AdminHost}}/api/v1/admin/comparison-groups
+Authorization: Bearer {{AdminToken}}
+
+###
+GET {{AdminHost}}/api/v1/admin/specification-definitions?pageSize=100
+Authorization: Bearer {{AdminToken}}
+
+### Create a draft: replace brand/category IDs with existing references.
+POST {{AdminHost}}/api/v1/admin/devices
+Authorization: Bearer {{AdminToken}}
+Content-Type: application/json
+
+{
+  "name": "Editorial device",
+  "slug": "editorial-device",
+  "brandId": "00000000-0000-0000-0000-000000000000",
+  "categoryId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Read before editing: PUT uses the data.content object as its body, not the entire response.
+GET {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}
+Authorization: Bearer {{AdminToken}}
+
+### Full replacement of content fields; copy current IDs/metadata first to avoid resetting fields.
+PUT {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}
+Authorization: Bearer {{AdminToken}}
+Content-Type: application/json
+
+{
+  "name": "Editorial device",
+  "slug": "editorial-device",
+  "brandId": "00000000-0000-0000-0000-000000000000",
+  "categoryId": "00000000-0000-0000-0000-000000000000",
+  "shortDescription": "Summary",
+  "description": "Overview",
+  "history": "Historical context",
+  "seoTitle": "Editorial device | TechVault",
+  "seoDescription": "Historical device overview",
+  "aliases": [],
+  "releaseYear": 2000
+}
+
+### Choose an existing NUMBER definition; this changes only that specification.
+PUT {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}/specifications/{{DefinitionId}}
+Authorization: Bearer {{AdminToken}}
+Content-Type: application/json
+
+{ "valueNumber": 0 }
+
+### Requires complete descriptive/history/SEO content.
+POST {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}/publish
+Authorization: Bearer {{AdminToken}}
+
+### Hide without deleting content.
+POST {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}/unpublish
+Authorization: Bearer {{AdminToken}}
+
+### Archive (read-only afterward). This does NOT physically delete the device.
+DELETE {{AdminHost}}/api/v1/admin/devices/{{DeviceId}}
+Authorization: Bearer {{AdminToken}}

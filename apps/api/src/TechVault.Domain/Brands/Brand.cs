@@ -18,4 +18,13 @@ public sealed class Brand : BaseEntity
     public string Description { get; private set; } = "";
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
+
+    public void UpdateDetails(string name, string description)
+    {
+        name = CatalogRules.Required(name, 200, nameof(name));
+        description = CatalogRules.Text(description, 100_000, nameof(description));
+        Name = name;
+        Description = description;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }

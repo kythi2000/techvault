@@ -3,6 +3,7 @@ using TechVault.Application.Brands;
 using TechVault.Application.Brands.GetBrand;
 using TechVault.Application.Brands.GetBrands;
 using TechVault.Application.Categories.GetCategories;
+using TechVault.Application.Comparisons;
 using TechVault.Application.Devices.BrowseDevices;
 using TechVault.Application.Devices.GetDevice;
 using TechVault.Application.Devices.GetDeviceSpecifications;
@@ -76,6 +77,12 @@ public static class PublicCatalogEndpoints
             (await handler.HandleAsync(query, cancellationToken)).ToPagedHttpResult(context))
             .WithName("GetTimeline").Produces<PaginatedResponse<DeviceCardResponse>>()
             .Produces<ApiErrorResponse>(400);
+
+        api.MapGet("/compare", async ([AsParameters] CompareDevicesQuery query, CompareDevicesHandler handler,
+                HttpContext context, CancellationToken cancellationToken) =>
+            (await handler.HandleAsync(query, cancellationToken)).ToHttpResult(context))
+            .WithName("CompareDevices").Produces<ApiResponse<CompareDevicesResponse>>()
+            .Produces<ApiErrorResponse>(400).Produces<ApiErrorResponse>(404);
 
         return endpoints;
     }

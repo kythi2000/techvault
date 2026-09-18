@@ -1,6 +1,6 @@
-# Public catalog API — Phases 4–6
+# Public catalog API — Phases 4–7
 
-Base path: `/api/v1`. These are read-only, unauthenticated endpoints. The API must point to a database with all migrations applied, including Phase 6's `AddCatalogDiscovery`. Migrations and catalog seeding remain explicit commands; startup never performs them. See [local setup](../../README.md) and [HTTP examples](../../apps/api/src/TechVault.Api/TechVault.Api.http).
+Base path: `/api/v1`. These are read-only, unauthenticated endpoints. The API must point to a database with all migrations applied, including `AddCatalogDiscovery` and `AddCatalogComparisons`. Migrations and catalog seeding remain explicit commands; startup never performs them. See [local setup](../../README.md) and [HTTP examples](../../apps/api/src/TechVault.Api/TechVault.Api.http).
 
 ## Endpoints
 
@@ -16,6 +16,7 @@ Base path: `/api/v1`. These are read-only, unauthenticated endpoints. The API mu
 | `/categories` | Paginated flat taxonomy, ordered by display order then slug; each item includes parent ID/slug. Parents may be on another page. |
 | `/search?q=...` | Paginated published-device cards ordered by full-text relevance, then slug. |
 | `/timeline` | Paginated published-device cards with known release years, oldest first. |
+| `/compare?devices=a,b` | Two compatible Published devices and aligned comparable specification rows; see [comparison contract](COMPARISON.md). |
 
 Cards contain `id`, `name`, `slug`, `shortDescription`, brand/category references, `releaseYear`, and `releaseDate`. A brand reference contains ID/name/slug. A category reference additionally contains `parentCategoryId` and `parentSlug`. Detail adds `description`, `history`, `seoTitle`, `seoDescription`, `discontinuedDate`, `physicalDetails` (nullable height/width/depth in mm and weight in grams), `createdAt`, `updatedAt`, `publishedAt`, and `specificationGroups`.
 
@@ -64,7 +65,7 @@ Timeline excludes records with unknown `releaseYear`, even with no date filters;
 
 ## Pagination and response envelopes
 
-Every list endpoint accepts `page` (default 1, range 1–10,000) and `pageSize` (default 24, range 1–100). Invalid bounds are rejected, not clamped. Database queries apply filters and ordering before offset/limit; they do not materialize the device catalog to paginate it.
+Every paginated list endpoint accepts `page` (default 1, range 1–10,000) and `pageSize` (default 24, range 1–100). Comparison is a single result containing exactly two devices, not a paginated list. Invalid bounds are rejected, not clamped. Database queries apply filters and ordering before offset/limit; they do not materialize the device catalog to paginate it.
 
 Successful detail responses wrap their DTO in `data`. List responses use:
 
@@ -115,6 +116,6 @@ dotnet test apps/api/TechVault.slnx
 dotnet ef migrations has-pending-model-changes --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
 ```
 
-The EF command requires the configured `DATABASE_URL` and restored local tool; it does not apply migrations. Add `-c Release` to build/test and `--configuration Release` to EF when a running Debug API locks output. PostgreSQL tests use disposable containers with both the real four-device seed and dedicated synthetic fixtures, not your local database. They exercise all ten endpoints, cross-category reads, published visibility, editorial read-through, combined filters, stable pagination, typed/ordered specifications, no-tracking reads, Development OpenAPI, Production error contracts, and database outages. Discovery tests additionally cover every indexed field, relevance ties, brand/device edits, visibility changes, migration backfill/down/up, and real `EXPLAIN (ANALYZE, BUFFERS)` plans on 8,000 synthetic records after routine vacuum/analyze; the planner is not forced to avoid sequential scans.
+The EF command requires the configured `DATABASE_URL` and restored local tool; it does not apply migrations. Add `-c Release` to build/test and `--configuration Release` to EF when a running Debug API locks output. PostgreSQL tests use disposable containers with both the real four-device seed and dedicated synthetic fixtures, not your local database. They exercise all eleven endpoints, cross-category reads, published visibility, editorial read-through, combined filters, stable pagination, typed/ordered specifications, no-tracking reads, Development OpenAPI, Production error contracts, and database outages. Discovery tests additionally cover every indexed field, relevance ties, brand/device edits, visibility changes, migration backfill/down/up, and real `EXPLAIN (ANALYZE, BUFFERS)` plans on 8,000 synthetic records after routine vacuum/analyze; the planner is not forced to avoid sequential scans.
 
-Comparison compatibility, admin mutations/authentication, product families, caching, and frontend discovery work are intentionally absent.
+Phase 7 comparison uses one concrete Application handler with the existing DbContext abstraction and error envelope, not a strategy/resolver or separate service. It adds compatibility/reference metadata and a migration; existing browse/detail/specification DTOs are unchanged. The comparison endpoint exposes only opted-in definitions. Admin mutations/authentication, product families, caching, and frontend changes remain out of scope.

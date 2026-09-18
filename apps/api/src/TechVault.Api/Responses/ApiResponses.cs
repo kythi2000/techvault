@@ -19,12 +19,16 @@ internal static class ApiResponses
     public static IResult ToPagedHttpResult<T>(this Result<PagedResult<T>> result, HttpContext context) =>
         result.IsSuccess ? TypedResults.Ok(new PaginatedResponse<T>(result.Value.Items, result.Value.Pagination)) : Failure(result.Error!, context);
 
+    public static IResult ToCreatedHttpResult<T>(this Result<T> result, HttpContext context, Func<T, string> location) where T : notnull =>
+        result.IsSuccess ? TypedResults.Created(location(result.Value), new ApiResponse<T>(result.Value)) : Failure(result.Error!, context);
+
     private static IResult Failure(Error error, HttpContext context) => Results.Json(
         new ApiErrorResponse(new(error.Code, error.Message, TraceId(context))),
         statusCode: error.Type switch
         {
             ErrorType.Validation => StatusCodes.Status400BadRequest,
             ErrorType.NotFound => StatusCodes.Status404NotFound,
+            ErrorType.Conflict => StatusCodes.Status409Conflict,
             _ => throw new InvalidOperationException("Unmapped application error type.")
         });
 }

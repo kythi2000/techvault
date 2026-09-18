@@ -42,6 +42,7 @@ public static class Nokia3310Seed
         }
 
         var device = new Device("Nokia 3310", "nokia-3310", nokia, featurePhones);
+        device.SetComparisonGroup(await new CatalogSeedReferences(db, cancellationToken).ComparisonGroupAsync("Phones", "phone"));
         device.UpdateContent(
             "A 2000 GSM phone built around calls, text messaging, and personalisation.",
             "The original Nokia 3310 supports GSM 900/1800 networks, SMS chat, and longer messages assembled from up to three SMS messages. Replaceable covers and downloadable profiles let owners personalise the phone.",
@@ -58,7 +59,7 @@ public static class Nokia3310Seed
         var software = await GetGroupAsync("Software", "software", 50);
 
         await AddSpecificationAsync(general, "Announcement date", "announcement_date", 10,
-            SpecificationValue.Date(new DateOnly(2000, 9, 1)));
+            SpecificationValue.Date(new DateOnly(2000, 9, 1)), isComparable: false);
         await AddSpecificationAsync(design, "Replaceable front and back covers", "replaceable_covers", 10,
             SpecificationValue.Boolean(true));
         await AddSpecificationAsync(design, "Antenna", "antenna", 20, SpecificationValue.Text("Internal"));
@@ -90,12 +91,12 @@ public static class Nokia3310Seed
         }
 
         async Task AddSpecificationAsync(SpecificationGroup group, string name, string key, int order,
-            SpecificationValue value, string? unit = null)
+            SpecificationValue value, string? unit = null, bool isComparable = true)
         {
             var definition = await db.SpecificationDefinitions.SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
             if (definition is null)
             {
-                definition = new SpecificationDefinition(name, key, group, value.DataType, order, unit);
+                definition = new SpecificationDefinition(name, key, group, value.DataType, order, unit, isComparable);
                 db.SpecificationDefinitions.Add(definition);
             }
             else if (definition.DataType != value.DataType || definition.Unit != unit)

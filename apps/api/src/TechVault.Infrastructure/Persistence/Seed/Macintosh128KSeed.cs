@@ -17,6 +17,7 @@ internal static class Macintosh128KSeed
         var allInOne = await references.CategoryAsync("All-in-One Computers", "all-in-one-computers", 10,
             "Computers with the display and main system integrated into one enclosure.", computers);
         var device = new Device("Macintosh 128K", "macintosh-128k", apple, allInOne);
+        device.SetComparisonGroup(await references.ComparisonGroupAsync("All-in-One Computers", "all_in_one"));
         // Factory configuration, without third-party memory upgrades. See docs/catalog/SEED_DATA.md.
         device.UpdateContent(
             "Apple's 1984 compact Macintosh, combining a built-in monochrome CRT with a 68000 processor and 128 KiB of RAM.",

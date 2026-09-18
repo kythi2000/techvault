@@ -20,6 +20,7 @@ internal sealed class SpecificationDefinitionConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Key).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Unit).HasMaxLength(50);
+        builder.Property(x => x.IsComparable).HasDefaultValue(false);
         builder.HasIndex(x => x.Key).IsUnique();
         builder.HasOne(x => x.Group).WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
     }

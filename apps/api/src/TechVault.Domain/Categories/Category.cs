@@ -25,4 +25,14 @@ public sealed class Category : BaseEntity
     public int DisplayOrder { get; private set; }
     public Guid? ParentCategoryId { get; private set; }
     public Category? Parent { get; private set; }
+
+    public void UpdateDetails(string name, string description, int displayOrder)
+    {
+        name = CatalogRules.Required(name, 200, nameof(name));
+        description = CatalogRules.Text(description, 100_000, nameof(description));
+        ArgumentOutOfRangeException.ThrowIfNegative(displayOrder);
+        Name = name;
+        Description = description;
+        DisplayOrder = displayOrder;
+    }
 }

@@ -17,6 +17,7 @@ internal static class Nokia3210Seed
         var featurePhones = await references.CategoryAsync("Feature Phones", "feature-phones", 10,
             "Phones centered on calls, messaging, and built-in applications.", phones);
         var device = new Device("Nokia 3210", "nokia-3210", nokia, featurePhones);
+        device.SetComparisonGroup(await references.ComparisonGroupAsync("Phones", "phone"));
         // Original 1999 handset, not the 2024 reissue. Sources and precision decisions: docs/catalog/SEED_DATA.md.
         device.UpdateContent(
             "A 1999 dual-band GSM phone with an internal antenna, interchangeable covers, and predictive text.",
@@ -32,7 +33,7 @@ internal static class Nokia3210Seed
         var network = await references.GroupAsync("Network", "network", 40);
         var software = await references.GroupAsync("Software", "software", 50);
         await references.SpecificationAsync(device, general, "Announcement date", "announcement_date", 10,
-            SpecificationValue.Date(new DateOnly(1999, 3, 18)));
+            SpecificationValue.Date(new DateOnly(1999, 3, 18)), isComparable: false);
         await references.SpecificationAsync(device, design, "Replaceable front and back covers", "replaceable_covers", 10,
             SpecificationValue.Boolean(true));
         await references.SpecificationAsync(device, design, "Antenna", "antenna", 20, SpecificationValue.Text("Internal"));

@@ -1,6 +1,6 @@
 # TechVault Web
 
-The public Next.js frontend for the TechVault digital technology archive. Its current scope implements Frontend Phases 1–4: foundation, public catalog browse, the device detail/specification vertical slice, and brand/category taxonomy pages. See [the frontend specification](../../docs/FRONTEND_SPEC.md).
+The public Next.js frontend for the TechVault digital technology archive. Its current scope implements Frontend Phases 1–5: foundation, public catalog browse, device detail/specifications, taxonomy pages, and search/timeline backed by Backend Phase 6. See [the frontend specification](../../docs/FRONTEND_SPEC.md).
 
 ## Run locally
 
@@ -22,6 +22,18 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 `TECHVAULT_API_URL` is server-only. Never expose admin credentials with a `NEXT_PUBLIC_` prefix.
+
+## Search and timeline
+
+Apply the backend `AddCatalogDiscovery` migration and run the catalog seed as described in the [root README](../../README.md). With the API running, try:
+
+- `/search?q=Nokia` — relevance-ordered results; search uses complete words, not partial names or typo correction.
+- `/timeline` — known release years, earliest first.
+- `/timeline?type=computers&brand=apple` — computer history for one maker.
+- `/timeline?era=1990s` — a decade spanning both device types.
+- `/timeline?fromYear=1980&toYear=2000&pageSize=2` — year range with URL-preserving pagination.
+
+Search accepts `q`, `page`, and `pageSize`; timeline accepts brand/category/type/year/range/era filters and pagination. Forms reset the page when filters change. Timeline shows unknown exact dates explicitly and excludes records whose release year is unknown. Desktop supports native scrolling and Earlier/Later controls; mobile uses a vertical timeline.
 
 ## Quality checks
 

@@ -6,8 +6,10 @@ const navigation = [
   { href: "/devices", label: "Archive" },
   { href: "/phones", label: "Phones" },
   { href: "/computers", label: "Computers" },
+  { href: "/timeline", label: "Timeline" },
   { href: "/brands", label: "Brands" },
   { href: "/categories", label: "Categories" },
+  { href: "/search", label: "Search" },
 ] as const;
 
 export function SiteHeader() {

@@ -69,7 +69,9 @@ public sealed class CatalogPersistenceTests : IAsyncLifetime
         Assert.Equal("NiMH", device.Specifications.Single(x => x.Definition.Key == "battery_chemistry").ValueText);
         Assert.True(device.Specifications.Single(x => x.Definition.Key == "sms_chat").ValueBoolean);
         Assert.Equal(new DateOnly(2000, 9, 1), device.Specifications.Single(x => x.Definition.Key == "announcement_date").ValueDate);
-        Assert.Contains("InitialCatalog", Assert.Single(await db.Database.GetAppliedMigrationsAsync(CancellationToken)));
+        Assert.Collection(await db.Database.GetAppliedMigrationsAsync(CancellationToken),
+            migration => Assert.EndsWith("_InitialCatalog", migration),
+            migration => Assert.EndsWith("_AddCatalogDiscovery", migration));
         Assert.Empty(await db.Database.GetPendingMigrationsAsync(CancellationToken));
         Assert.False(db.Database.HasPendingModelChanges());
         Assert.Null(db.Model.FindEntityType(typeof(BaseEntity)));

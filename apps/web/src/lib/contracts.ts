@@ -30,6 +30,11 @@ export const deviceCardSchema = z.object({
   releaseDate: dateSchema,
 });
 
+// Unlike browse/search, the timeline contract guarantees a known release year.
+export const timelineDeviceSchema = deviceCardSchema.extend({
+  releaseYear: z.number().int().min(1).max(9999),
+});
+
 export const specificationSchema = z.object({
   id: idSchema,
   key: z.string(),
@@ -120,6 +125,7 @@ export const paginatedResponseSchema = <T extends z.ZodType>(item: T) =>
   });
 
 export type DeviceCard = z.infer<typeof deviceCardSchema>;
+export type TimelineDevice = z.infer<typeof timelineDeviceSchema>;
 export type DeviceDetail = z.infer<typeof deviceDetailSchema>;
 export type Specification = z.infer<typeof specificationSchema>;
 export type SpecificationGroup = z.infer<typeof specificationGroupSchema>;

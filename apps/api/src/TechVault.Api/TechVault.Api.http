@@ -17,7 +17,7 @@ Accept: text/plain
 
 ###
 
-# Public catalog requires the Phase 3 migration; seed explicitly to load Nokia 3310.
+# Apply all migrations, including AddCatalogDiscovery; --seed-catalog loads the four Phase 5 samples.
 # Default sort: release-desc, page=1, pageSize=24. Published devices only.
 GET {{TechVault.Api_HostAddress}}/api/v1/devices
 Accept: application/json
@@ -45,7 +45,7 @@ Accept: application/json
 
 ###
 
-# HTTP 200 with empty data for the current Nokia-only seed.
+# Two Apple computers after the Phase 5 seed; empty results remain valid on an older/unseeded database.
 GET {{TechVault.Api_HostAddress}}/api/v1/computers
 Accept: application/json
 
@@ -80,6 +80,93 @@ Accept: application/json
 
 # Malformed numeric input also returns the standard JSON 400 envelope.
 GET {{TechVault.Api_HostAddress}}/api/v1/devices?page=abc
+Accept: application/json
+
+###
+
+# Original 1999 phone, not the 2024 reissue.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/nokia-3210
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/nokia-3210/specifications
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/macintosh-128k
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/macintosh-128k/specifications
+Accept: application/json
+
+###
+
+# Original 1998 233 MHz configuration.
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/imac-g3
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/devices/imac-g3/specifications
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/computers?brand=apple&category=all-in-one-computers&sort=release-asc
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/brands/apple
+Accept: application/json
+
+###
+
+# Cross-category result: iMac G3 (1998), then Nokia 3210 (1999).
+GET {{TechVault.Api_HostAddress}}/api/v1/devices?decade=1990&sort=release-asc
+Accept: application/json
+
+###
+
+# Whole-word, case-insensitive full-text search across name, brand, descriptions, aliases, and model number.
+GET {{TechVault.Api_HostAddress}}/api/v1/search?q=Nokia%203310
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/search?q=Apple&page=1&pageSize=2
+Accept: application/json
+
+###
+
+# Global timeline: oldest year/date first, unknown years omitted, year-only dates stay null.
+GET {{TechVault.Api_HostAddress}}/api/v1/timeline
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/timeline?era=1990s
+Accept: application/json
+
+###
+
+GET {{TechVault.Api_HostAddress}}/api/v1/timeline?type=computers&brand=apple&category=computers&fromYear=1980&toYear=1999&pageSize=24
+Accept: application/json
+
+###
+
+# HTTP 400: search requires a nonempty q.
+GET {{TechVault.Api_HostAddress}}/api/v1/search
+Accept: application/json
+
+###
+
+# HTTP 400: era must use a decade label such as 1990s.
+GET {{TechVault.Api_HostAddress}}/api/v1/timeline?era=1991s
 Accept: application/json
 
 ###

@@ -6,6 +6,8 @@ using TechVault.Application.Categories.GetCategories;
 using TechVault.Application.Devices.BrowseDevices;
 using TechVault.Application.Devices.GetDevice;
 using TechVault.Application.Devices.GetDeviceSpecifications;
+using TechVault.Application.Search;
+using TechVault.Application.Timeline;
 
 namespace TechVault.Api.Endpoints;
 
@@ -61,6 +63,18 @@ public static class PublicCatalogEndpoints
                 HttpContext context, CancellationToken cancellationToken) =>
             (await handler.HandleAsync(query, cancellationToken)).ToPagedHttpResult(context))
             .WithName("GetCategories").Produces<PaginatedResponse<CategoryResponse>>()
+            .Produces<ApiErrorResponse>(400);
+
+        api.MapGet("/search", async ([AsParameters] SearchDevicesQuery query, SearchDevicesHandler handler,
+                HttpContext context, CancellationToken cancellationToken) =>
+            (await handler.HandleAsync(query, cancellationToken)).ToPagedHttpResult(context))
+            .WithName("SearchDevices").Produces<PaginatedResponse<DeviceCardResponse>>()
+            .Produces<ApiErrorResponse>(400);
+
+        api.MapGet("/timeline", async ([AsParameters] GetTimelineQuery query, GetTimelineHandler handler,
+                HttpContext context, CancellationToken cancellationToken) =>
+            (await handler.HandleAsync(query, cancellationToken)).ToPagedHttpResult(context))
+            .WithName("GetTimeline").Produces<PaginatedResponse<DeviceCardResponse>>()
             .Produces<ApiErrorResponse>(400);
 
         return endpoints;

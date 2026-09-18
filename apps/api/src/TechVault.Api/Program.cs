@@ -19,7 +19,7 @@ if (args.Contains("--seed-catalog", StringComparer.Ordinal))
 {
     await using (var scope = app.Services.CreateAsyncScope())
     {
-        await Nokia3310Seed.SeedAsync(scope.ServiceProvider.GetRequiredService<ITechVaultDbContext>(),
+        await CatalogSeed.SeedAsync(scope.ServiceProvider.GetRequiredService<ITechVaultDbContext>(),
             app.Lifetime.ApplicationStopping);
     }
     app.Logger.LogInformation("Catalog seed completed; existing editorial content was preserved.");

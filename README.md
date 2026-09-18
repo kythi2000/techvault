@@ -1,6 +1,6 @@
 # TechVault
 
-A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–4 in [the backend roadmap](docs/BACKEND_ROADMAP.md). The Next.js app covers Frontend Phases 1–4 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, the device detail/specification vertical slice, and brand/category taxonomy pages.
+A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–6 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, and a chronological timeline. The Next.js app covers Frontend Phases 1–5 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, device detail/specifications, taxonomy pages, search, and a responsive timeline.
 
 ## Frontend
 
@@ -13,6 +13,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. `TECHVAULT_API_URL` defaults to `http://localhost:5078`; see [the web README](apps/web/README.md) for configuration and quality checks. When the catalog API is unavailable, the public shell still renders and data surfaces show an explicit unavailable state.
+
+With Backend Phase 6 migrated and running, open `/search?q=Nokia` or `/timeline?era=1990s`. Search and timeline keep their query, filters, and pagination in shareable URLs.
 
 ## Local build and run
 
@@ -65,7 +67,7 @@ With Docker running, execute the complete suite:
 dotnet test apps/api/TechVault.slnx
 ```
 
-Integration tests use Testcontainers to create disposable PostgreSQL containers with random ports and credentials; they do not use the Compose database or your `DATABASE_URL`. They verify connectivity/outages, no automatic schema creation, migration up/down, catalog round-trips, constraints, preservation of editorial changes across repeated seeds, and the public API contracts. API tests cover combined filters, deterministic pagination, typed specifications, unpublished visibility, and JSON errors in Production. Additional synthetic records exist only in test fixtures, not in the sample seed. The first run downloads the container images. If a Debug API process locks build output on Windows, stop it or add `-c Release` to the build/test commands.
+Integration tests use Testcontainers to create disposable PostgreSQL containers with random ports and credentials; they do not use the Compose database or your `DATABASE_URL`. They verify connectivity/outages, no automatic schema creation, migration up/down, catalog round-trips, constraints, preservation of editorial changes across repeated seeds, and the public API contracts. API tests cover combined filters, deterministic pagination, typed specifications, unpublished visibility, and JSON errors in Production. Mixed-catalog tests exercise the real four-device seed, upgrades from the Nokia-only dataset, shared phone/computer reads, and non-overwriting reseeds. Additional synthetic records exist only in test fixtures, not in the sample seed. The first run downloads the container images. If a Debug API process locks build output on Windows, stop it or add `-c Release` to the build/test commands.
 
 To verify the running API manually, request both health endpoints, run `docker compose stop postgres`, and request them again: readiness should be 503 and liveness should stay 200. Run `docker compose up -d postgres --wait` to restore PostgreSQL and verify readiness returns to 200. `docker compose down` stops/removes the development container but preserves the named volume; avoid `down -v` unless you intend to delete the local database.
 
@@ -80,12 +82,12 @@ dotnet ef dbcontext info --project apps/api/src/TechVault.Infrastructure --start
 
 The context and migrations belong to Infrastructure; the API is the startup project. No separate design-time factory is needed. Normal API startup does not call `Migrate`, `EnsureCreated`, or the seed.
 
-## Phase 3: migrate and seed explicitly
+## Database migration and explicit catalog seed
 
 First set `DATABASE_URL` as described above. Verify its host, port, and database before proceeding: the following commands modify that database. Use a dedicated TechVault database, not the default `postgres` maintenance database or an unrelated application database.
 
 ```sh
-dotnet ef migrations script 0 InitialCatalog --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
+dotnet ef migrations script 0 --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
 dotnet ef database update --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
 dotnet run --project apps/api/src/TechVault.Api --launch-profile http -- --seed-catalog
 ```
@@ -94,16 +96,17 @@ Review the SQL produced by the first command before applying it. The seed comman
 
 On a fresh database, the first migration may log a failed query against the not-yet-created `__EFMigrationsHistory` table. [Npgsql handles that missing-table case](https://github.com/npgsql/efcore.pg/blob/v10.0.2/src/EFCore.PG/Migrations/Internal/NpgsqlHistoryRepository.cs) and continues creating the schema. Confirm that the command finishes successfully with exit code 0; do not disregard other database errors.
 
-The initial migration creates `Brands`, `Categories`, `Devices`, `SpecificationGroups`, `SpecificationDefinitions`, and `DeviceSpecifications`, plus EF migration history. It contains no seed content. Slugs/keys and device-definition pairs are unique; foreign keys and check constraints enforce references, publication state, dates, positive physical measurements, and typed specification values.
+The initial migration creates `Brands`, `Categories`, `Devices`, `SpecificationGroups`, `SpecificationDefinitions`, and `DeviceSpecifications`, plus EF migration history. It contains no seed content. Slugs/keys and device-definition pairs are unique; foreign keys and check constraints enforce references, publication state, dates, positive physical measurements, and typed specification values. Phase 6's `AddCatalogDiscovery` migration adds alias/model storage, a maintained search vector and GIN index, and a timeline index. Apply all migrations before running the current API or seed.
 
 Seed behavior:
 
-- If `nokia-3310` exists, do nothing: no content, status, timestamp, or specification changes, including for drafts or partially populated records.
-- Otherwise, reuse reference data by slug/key, insert missing references, and insert the device with its specifications in one `SaveChangesAsync` transaction.
+- The command now checks `nokia-3310`, `nokia-3210`, `macintosh-128k`, and `imac-g3` independently. If a device exists, skip it entirely: no content, classification, status, timestamp, or specification changes, including for drafts or partially populated records.
+- For each missing device, reuse reference data by slug/key, insert missing references, and insert the device with its specifications in one `SaveChangesAsync` transaction.
 - Existing reference labels/order/content are preserved. An incompatible definition type/unit or category parent causes an explicit error instead of an overwrite.
+- Devices are committed one at a time, not in one catalog-wide transaction. If a later device fails, earlier inserts remain; correct the conflicting reference deliberately and rerun the command in a fresh process to add only the remaining devices.
 - Run one seed process at a time. There is no synchronization/upsert engine or concurrent-seed retry mechanism.
 
-The sample contains Nokia, Phones → Feature Phones, five specification groups, and nine values covering text, number, boolean, and date. Content is sourced from [Nokia's original 1 September 2000 announcement](https://www.globenewswire.com/js/news-release/2000/09/01/1845525/0/en/Nokia-introduces-mobile-chat-with-the-Nokia-3310.html). The known release year is stored separately from the announcement date; an exact retail release date, dimensions, and discontinuation date are left unset because this source does not establish them. No image assets are included.
+On a fresh database, the sample contains two Nokia feature phones and two Apple all-in-one computers. Existing Nokia 3310 seed content is unchanged. See [seed data and historical sources](docs/catalog/SEED_DATA.md) for model variants, exact/unknown dates, shared specification units, and source caveats. No image assets are included.
 
 Model conventions:
 
@@ -136,6 +139,57 @@ curl -i http://localhost:5078/api/v1/categories
 
 On Windows PowerShell, use `curl.exe` to invoke curl rather than the `Invoke-WebRequest` alias. All eight endpoint examples are also in [TechVault.Api.http](apps/api/src/TechVault.Api/TechVault.Api.http); see [the public catalog contract](docs/api/PUBLIC_CATALOG.md) for responses, filters, sorting, and pagination limits.
 
-Only Published devices are public. Unknown and unpublished device slugs return the same JSON 404. `/computers` returns HTTP 200 with an empty list for the current Nokia-only seed. Lists return `{ "data": [], "pagination": { ... } }`; detail returns `{ "data": { ... } }`. API responses carry `X-Trace-Id`, and JSON errors include the same `error.traceId`.
+Only Published devices are public. Unknown and unpublished device slugs return the same JSON 404. Lists return `{ "data": [], "pagination": { ... } }`; detail returns `{ "data": { ... } }`. API responses carry `X-Trace-Id`, and JSON errors include the same `error.traceId`.
 
-The API delegates to concrete Application query handlers; EF queries project DTOs without tracking entities. Small `Result<T>`/pagination contracts support these actual use cases. No MediatR, repository, Unit of Work, extra package, schema change, or migration was introduced. Search, timeline, comparison, admin writes, and caching remain future phases.
+The API delegates to concrete Application query handlers; EF queries project DTOs without tracking entities. Small `Result<T>`/pagination contracts support these actual use cases. Phase 4 introduced no MediatR, repository, Unit of Work, extra package, schema change, or migration. Search/timeline are now implemented in Phase 6 below; comparison, admin writes, and caching remain future work.
+
+## Phase 5: two phones + two computers
+
+`--seed-catalog` inserts Nokia 3210, Macintosh 128K, and the original 1998 iMac G3 alongside Nokia 3310. Phase 5 introduced no migration or API contract. With all current migrations applied, verify `DATABASE_URL` targets the intended TechVault database and run:
+
+```sh
+dotnet run --project apps/api/src/TechVault.Api --launch-profile http -- --seed-catalog
+dotnet run --project apps/api/src/TechVault.Api --launch-profile http
+```
+
+On an unedited four-device dataset, `/phones` returns two devices and `/computers` returns two. Both computers belong to `Computers → All-in-One Computers`; no laptop, comparison-group, or relationship data is introduced. Try:
+
+```sh
+curl -i http://localhost:5078/api/v1/devices/nokia-3210
+curl -i http://localhost:5078/api/v1/devices/macintosh-128k
+curl -i http://localhost:5078/api/v1/devices/imac-g3/specifications
+curl -i "http://localhost:5078/api/v1/computers?brand=apple&category=all-in-one-computers&sort=release-asc"
+curl -i "http://localhost:5078/api/v1/devices?decade=1990&sort=release-asc"
+```
+
+The final query spans categories: iMac G3 (1998) and Nokia 3210 (1999). A database that has not rerun the seed can still return empty computer results; that is a valid 200 response, not an API failure. Seeding will not republish existing hidden records to force these expected counts.
+
+## Phase 6: search + timeline
+
+Review and explicitly apply `AddCatalogDiscovery` to your intended database before starting this version. For an existing Phase 3–5 database, first stop the old local API, verify `DATABASE_URL`, then run:
+
+```sh
+dotnet ef migrations script InitialCatalog AddCatalogDiscovery --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
+dotnet ef database update --project apps/api/src/TechVault.Infrastructure --startup-project apps/api/src/TechVault.Api
+dotnet run --project apps/api/src/TechVault.Api --launch-profile http
+```
+
+If relying on local `appsettings.Development.json` instead of an environment variable, append `-- --environment Development` to each EF command. Never log or commit credentials. API startup still does not migrate or seed. The migration backfills searchable text without changing existing editorial fields, timestamps, publication states, or specifications. No seed rerun is needed for existing records to become searchable. New aliases default to empty and model numbers to unknown; existing seed content is not overwritten to populate them.
+
+```sh
+curl -i "http://localhost:5078/api/v1/search?q=Nokia%203310"
+curl -i "http://localhost:5078/api/v1/search?q=Apple&page=1&pageSize=2"
+curl -i "http://localhost:5078/api/v1/timeline"
+curl -i "http://localhost:5078/api/v1/timeline?era=1990s"
+curl -i "http://localhost:5078/api/v1/timeline?type=computers&brand=apple&fromYear=1980&toYear=1999"
+```
+
+Both endpoints return the existing paginated device cards and only published devices. Search matches name, aliases, model number, brand name, short description, and description. It uses plain whole-word matching, not substring/fuzzy search; timeline sorts oldest first and omits devices without a known release year. See [the API contract](docs/api/PUBLIC_CATALOG.md) for ranking, era/date semantics, and bounds.
+
+No new package, separate service, comparison model, or admin endpoint is added. A feature-specific `IDeviceSearch` lets Infrastructure own PostgreSQL full-text details; Domain remains persistence-independent. Integration tests verify edits, visibility, migration backfill/down/up, and query plans on 8,000 disposable test records. Run the plan check with its output visible:
+
+```sh
+dotnet test apps/api/tests/TechVault.IntegrationTests/TechVault.IntegrationTests.csproj --filter FullyQualifiedName~Representative_search_and_chronology_queries_use_their_indexes --logger "console;verbosity=detailed"
+```
+
+The plan fixture runs `VACUUM (ANALYZE)` after bulk loading to flush the [GIN pending list](https://www.postgresql.org/docs/17/gin.html#GIN-FAST-UPDATE) and refresh statistics; it never disables sequential scans. A four-device catalog can legitimately use sequential scans. There is no additional application-managed vacuum job or catalog expansion in this phase. Reverting the discovery migration drops alias/model metadata, so use rollback only on disposable databases or after a reviewed backup; the implementation tests never migrate your local database.

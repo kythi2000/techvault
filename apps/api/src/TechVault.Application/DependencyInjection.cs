@@ -5,6 +5,8 @@ using TechVault.Application.Categories.GetCategories;
 using TechVault.Application.Devices.BrowseDevices;
 using TechVault.Application.Devices.GetDevice;
 using TechVault.Application.Devices.GetDeviceSpecifications;
+using TechVault.Application.Search;
+using TechVault.Application.Timeline;
 
 namespace TechVault.Application;
 
@@ -18,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<GetBrandsHandler>();
         services.AddScoped<GetBrandHandler>();
         services.AddScoped<GetCategoriesHandler>();
+        services.AddScoped<SearchDevicesHandler>();
+        services.AddScoped<GetTimelineHandler>();
         return services;
     }
 }

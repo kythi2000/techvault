@@ -4,6 +4,7 @@ import { ArrowIcon } from "@/components/icons";
 import { DeviceCard } from "@/components/device-card";
 import { DeviceObject } from "@/components/device-object";
 import { RetryButton } from "@/components/retry-button";
+import { SearchForm } from "@/components/search-form";
 import { browseDevices } from "@/lib/techvault-api";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +77,7 @@ export default async function Home() {
       </section>
 
       <section className="featured-section shell">
+        <div className="home-search"><SearchForm id="home-search-query" /></div>
         <div className="section-heading">
           <div>
             <span className="eyebrow">From the archive</span>
@@ -110,10 +112,11 @@ export default async function Home() {
             {years.map((year, index) => (
               <li key={year}>
                 <span className="era-index">0{index + 1}</span>
-                <Link href={`/devices?year=${year}`}><strong>{year}</strong><p>Explore objects released in {year} →</p></Link>
+                <Link href={`/timeline?year=${year}`}><strong>{year}</strong><p>Explore objects released in {year} →</p></Link>
               </li>
             ))}
           </ol>
+          <Link href="/timeline" className="text-link era-timeline-link">Explore the full timeline <ArrowIcon /></Link>
         </div>
       </section>}
 

@@ -2,7 +2,7 @@
 
 Status: working specification  
 Scope: public web application in `apps/web`  
-Last updated: 2026-09-15
+Last updated: 2026-09-18
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ The frontend turns the public catalog API into two connected experiences:
 1. **Archive utility** — find a device, inspect its technical record, and move between brands, categories, and eras.
 2. **Digital museum** — understand why an object mattered through editorial context and deliberate visual presentation.
 
-The first release must make the current Nokia 3310 dataset useful and scale naturally to the planned four-device backend launch scope. It must not pretend that search, comparison, timelines, media, collections, or admin APIs already exist.
+The public frontend consumes Backend Phases 1–6, including the four-device phone/computer catalog and the search/timeline endpoints. Comparison, media, collections, and admin experiences still depend on future backend contracts.
 
 ## 2. Product principles
 
@@ -57,7 +57,8 @@ Archive → exact technical record → verify unknown values → later compare/t
 | `/brands/{slug}` | Brand overview and devices | Dynamic SSR | `GET /brands/{slug}`, `/devices?brand=` | Implemented |
 | `/categories` | Ordered classification index | Dynamic SSR | `GET /categories` | Implemented |
 | `/categories/{slug}` | Category overview and devices | Dynamic SSR | `GET /categories`, `/devices?category=` | Implemented |
-| `/timeline/*` | Chronological exploration | SSR shell + client interaction | Backend Phase 6 | Phase 5 |
+| `/search?q=...` | Full-text results in API relevance order | Dynamic SSR | `GET /search` | Implemented |
+| `/timeline` | Global/phone/computer/brand chronology via URL filters | Dynamic SSR + client scroll controls | `GET /timeline`, `/brands`, `/categories` | Implemented |
 | `/compare/*` | Two-device comparison | SSR + client selection | Backend Phase 7 | Phase 6 |
 | `/museum`, `/collections/*` | Curated stories | ISR | Future content APIs | Phase 7 |
 | `/admin/*` | Editorial CMS | Client-heavy, protected | Backend Phase 8 | Phase 8 |
@@ -119,6 +120,7 @@ apps/web/src/
     ├── contracts.ts     # Zod schemas and inferred public types
     ├── techvault-api.ts # server-side HTTP adapter and Result contract
     ├── browse-query.ts  # URL-state whitelist and serialization
+    ├── discovery-query.ts # separate search and timeline query contracts
     └── format.ts        # display-only formatting
 ```
 
@@ -141,10 +143,21 @@ Public pages call ASP.NET from Server Components using `TECHVAULT_API_URL`. The 
 Accepted URL state mirrors the API:
 
 ```text
-brand, category, year, fromYear, toYear, decade, sort, page, pageSize
+brand, category, type, year, fromYear, toYear, decade, sort, page, pageSize
 ```
 
-The UI currently exposes brand, category, decade, and sort. Direct URLs may use the remaining supported parameters. Unknown keys are not forwarded.
+The UI exposes brand, category, decade, and sort, with type, year/range, and page size under additional filters. Unknown keys are not forwarded.
+
+### Search and timeline state
+
+- Search accepts only `q`, `page`, and `pageSize`. An initial `/search` visit prompts for a query without calling the API. An explicitly submitted empty/invalid query displays the backend validation error.
+- Search uses complete words, matches all supplied words, and retains API relevance order. It does not offer unsupported sort, taxonomy filters, autocomplete, fuzzy matching, or client-side ranking.
+- Timeline accepts only `brand`, `category`, `type`, `year`, `fromYear`, `toYear`, `era`, `page`, and `pageSize`. A single `/timeline` route covers global and scoped views; e.g. `/timeline?type=phones`, `/timeline?brand=nokia`, `/timeline?era=1990s`.
+- `era` is forwarded as the backend decade label (`0010s` through `9990s`). Browse-only `decade` and `sort` are never forwarded to timeline.
+- Both views default to 12 records per page, retain filters in pagination links, reset to the first page on form submission, and distinguish no matches from a page beyond the last result.
+- Timeline preserves API order: release year, exact release date (unknown last), then slug. A year-only record displays an unknown exact date; FE never invents January 1. The timeline schema rejects a missing release year.
+- Timeline cards are server-rendered in a horizontally scrollable region on desktop and a vertical sequence on mobile. A small client component adds Earlier/Later buttons, tracks scroll limits, and honors reduced motion; native scrolling, keyboard access, filters, and pagination work without client state libraries.
+- On taxonomy API failure, current selected values remain in filter controls and a notice is shown. Discovery data can still render independently.
 
 ### Runtime validation
 
@@ -210,6 +223,7 @@ Initial requirements:
 - unique page title and description;
 - canonical URL without browse query parameters;
 - `noindex` for not-found pages;
+- `noindex, follow` for search results and filtered/paginated timeline views; canonical URLs remain `/search` and `/timeline` respectively;
 - meaningful internal links between browse, detail, and specs;
 - metadata never blocks public content for normal visitors.
 
@@ -256,14 +270,14 @@ Target production checks: LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms at the 75th
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
-- production HTTP smoke checks for home, browse, taxonomy, filter URL, empty computers, detail, specs, and missing routes;
+- production HTTP smoke checks for home, browse, taxonomy, search, timeline, URL filters, mixed phone/computer data, empty results, detail, specs, and missing routes;
 - desktop and mobile visual inspection;
 - no unexpected browser console errors.
 
 ### Implemented with stable synthetic fixtures
 
-- Node tests for query serialization, typed specification formatting, contract failures, and paged taxonomy references;
-- production-server smoke tests for SSR content, typed values, URL preservation, metadata, canonical links, errors, and hard 404 responses.
+- Node tests for browse/discovery query whitelists and serialization, typed specification formatting, API errors, timeline year validation, and paged taxonomy references;
+- production-server smoke tests for SSR content, typed values, search relevance order, timeline chronology/date precision, filter preservation, pagination, metadata, errors, and hard 404 responses.
 
 ### Deferred test automation
 
@@ -271,10 +285,11 @@ Target production checks: LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms at the 75th
 - Playwright journeys against a seeded disposable API;
 - automated accessibility checks and mobile/desktop screenshot regression.
 
-### Verification snapshot — 2026-09-15
+### Verification snapshot — 2026-09-18
 
 - Lint, generated route types, strict TypeScript, unit/contract tests, production build, and HTTP smoke suite pass.
 - Browser-driven visual/console inspection is still required before release; the current Codex browser runtime could not initialize because its sandbox policy metadata was unavailable.
+- The Phase 5 HTTP smoke suite uses a temporary contract-compatible API with synthetic mixed-catalog records. A live API was not listening on the default local port during verification; end-to-end checks against the migrated/seeded database remain a local integration check.
 
 ## 14. Delivery phases
 
@@ -302,11 +317,11 @@ Deliver brand and category indexes/detail pages, meaningful internal linking, pa
 
 Dependency satisfied by the current public brand/category/device APIs.
 
-### Phase 5 — Search and timeline
+### Phase 5 — Search and timeline — implemented
 
-Deliver search results and accessible responsive timeline interaction. URL state remains canonical; the horizontal desktop experience becomes a vertical sequence on mobile.
+Deliver `/search`, `/timeline`, dedicated query whitelists and API adapters, URL-driven GET forms, pagination, recoverable errors, empty states, metadata, and discovery links from home/navigation/catalog/taxonomy pages. The horizontal desktop timeline becomes a vertical sequence on mobile.
 
-Dependency: Backend Phase 6 search/timeline endpoints and multi-era sample data.
+Dependency satisfied by Backend Phase 6 search/timeline endpoints and Backend Phase 5 mixed sample data. FE Phase 6 comparison still requires Backend Phase 7.
 
 ### Phase 6 — Comparison
 

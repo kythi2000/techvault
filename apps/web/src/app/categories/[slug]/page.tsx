@@ -69,6 +69,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps<"
         </div>
         <div className="taxonomy-hero-copy">
           <p>{category.description || "An archive classification awaiting further editorial context."}</p>
+          <Link href={`/timeline?category=${category.slug}`} className="text-link">Explore this category through time</Link>
           {category.parentSlug && <Link href={`/categories/${category.parentSlug}`} className="text-link">View parent collection</Link>}
         </div>
       </header>

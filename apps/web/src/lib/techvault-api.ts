@@ -9,13 +9,16 @@ import {
   deviceCardSchema,
   deviceDetailSchema,
   paginatedResponseSchema,
+  timelineDeviceSchema,
   type ApiError,
   type Brand,
   type Category,
   type DeviceCard,
   type Pagination,
+  type TimelineDevice,
 } from "./contracts.ts";
 import { toQuery, type BrowseParams, type BrowseRoute } from "./browse-query.ts";
+import { toSearchQuery, toTimelineQuery, type SearchParams, type TimelineParams } from "./discovery-query.ts";
 
 const apiBaseUrl = (
   process.env.TECHVAULT_API_URL ?? "http://localhost:5078"
@@ -87,6 +90,14 @@ export function browseDevices(
     `/api/v1${route}${toQuery(params)}`,
     paginatedResponseSchema(deviceCardSchema),
   );
+}
+
+export function searchDevices(params: SearchParams): Promise<ApiResult<PaginatedData<DeviceCard>>> {
+  return request(`/api/v1/search${toSearchQuery(params)}`, paginatedResponseSchema(deviceCardSchema));
+}
+
+export function getTimeline(params: TimelineParams = {}): Promise<ApiResult<PaginatedData<TimelineDevice>>> {
+  return request(`/api/v1/timeline${toTimelineQuery(params)}`, paginatedResponseSchema(timelineDeviceSchema));
 }
 
 export const getDevice = cache((slug: string) =>

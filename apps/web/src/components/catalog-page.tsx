@@ -50,6 +50,11 @@ export async function CatalogPage({
             <Link href={route}>Reset</Link>
           </div>
 
+          <div className="catalog-discovery-links">
+            <Link href="/search">Search by name →</Link>
+            <Link href={route === "/devices" ? "/timeline" : `/timeline?type=${route.slice(1)}`}>Explore timeline →</Link>
+          </div>
+
           {(!brandsResult.ok || !categoriesResult.ok) && (
             <p className="filter-notice" role="status">Some filter choices could not be loaded. Your current filters are preserved.</p>
           )}

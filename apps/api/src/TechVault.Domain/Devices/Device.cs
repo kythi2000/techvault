@@ -8,6 +8,7 @@ namespace TechVault.Domain.Devices;
 public sealed class Device : BaseEntity
 {
     private readonly List<DeviceSpecification> _specifications = [];
+    private List<string> _aliases = [];
 
     private Device() { }
 
@@ -25,6 +26,8 @@ public sealed class Device : BaseEntity
 
     public string Name { get; private set; } = null!;
     public string Slug { get; private set; } = null!;
+    public string? ModelNumber { get; private set; }
+    public IReadOnlyList<string> Aliases => _aliases.AsReadOnly();
     public Guid BrandId { get; private set; }
     public Brand Brand { get; private set; } = null!;
     public Guid CategoryId { get; private set; }
@@ -46,6 +49,20 @@ public sealed class Device : BaseEntity
     public DateTimeOffset UpdatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PublishedAt { get; private set; }
     public IReadOnlyCollection<DeviceSpecification> Specifications => _specifications.AsReadOnly();
+
+    public void SetSearchMetadata(string? modelNumber, IEnumerable<string> aliases)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        modelNumber = modelNumber is null ? null : CatalogRules.Required(modelNumber, 100, nameof(modelNumber));
+        var values = aliases.Take(21).Select(x => CatalogRules.Required(x, 100, nameof(aliases))).ToList();
+        if (values.Count > 20)
+            throw new ArgumentException("A device can have at most 20 aliases.", nameof(aliases));
+
+        // Validate the whole edit first, and never retain a caller-owned mutable collection.
+        _aliases = values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        ModelNumber = modelNumber;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 
     public void UpdateContent(string shortDescription, string description, string history,
         string seoTitle, string seoDescription)

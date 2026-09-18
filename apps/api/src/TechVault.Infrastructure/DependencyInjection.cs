@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TechVault.Application.Common.Abstractions;
+using TechVault.Application.Search;
 using TechVault.Infrastructure.Persistence;
+using TechVault.Infrastructure.Search;
 
 namespace TechVault.Infrastructure;
 
@@ -28,6 +30,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ITechVaultDbContext>(provider => provider.GetRequiredService<TechVaultDbContext>());
+        services.AddScoped<IDeviceSearch, PostgreSqlDeviceSearch>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<TechVaultDbContext>("postgres", tags: ["ready"]);

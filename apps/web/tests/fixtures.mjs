@@ -65,3 +65,20 @@ export const detail = {
 export function paged(data, page = 1, pageSize = 12, total = data.length) {
   return { data, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } };
 }
+
+export const appleBrand = { ...brand, id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Apple", slug: "apple" };
+export const computerCategory = {
+  ...category,
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  name: "All-in-one Computers",
+  slug: "all-in-one-computers",
+  parentCategoryId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  parentSlug: "computers",
+};
+// Ordered as a synthetic relevance result, deliberately not chronological/alphabetical.
+export const discoveryDevices = [
+  card,
+  { ...card, id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", name: "Nokia 3210", slug: "nokia-3210", releaseYear: 1999 },
+  { ...card, id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", name: "iMac G3", slug: "imac-g3", brand: appleBrand, category: computerCategory, releaseYear: 1998, releaseDate: "1998-08-15" },
+  { ...card, id: "ffffffff-ffff-4fff-8fff-ffffffffffff", name: "Macintosh 128K", slug: "macintosh-128k", brand: appleBrand, category: computerCategory, releaseYear: 1984, releaseDate: "1984-01-24" },
+];

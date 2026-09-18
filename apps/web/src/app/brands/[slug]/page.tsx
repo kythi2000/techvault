@@ -65,6 +65,7 @@ export default async function BrandPage({ params, searchParams }: PageProps<"/br
         <div className="taxonomy-hero-copy">
           <p>{brand.description || "An archival maker record awaiting further editorial context."}</p>
           <span>{brand.publishedDeviceCount} {brand.publishedDeviceCount === 1 ? "published object" : "published objects"}</span>
+          <Link href={`/timeline?brand=${brand.slug}`} className="text-link">Explore {brand.name} through time</Link>
         </div>
       </header>
       <section className="shell taxonomy-collection" aria-labelledby="brand-objects">

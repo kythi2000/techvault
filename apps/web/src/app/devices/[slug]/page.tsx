@@ -80,6 +80,9 @@ export default async function DevicePage({ params }: PageProps<"/devices/[slug]"
                 View full specifications <ArrowIcon />
               </Link>
               <a href="#history" className="button button-light">Read its story</a>
+              <Link href={`/compare?devices=${encodeURIComponent(device.slug)}`} className="button button-light">
+                Compare this object
+              </Link>
             </div>
           </div>
           <DeviceObject

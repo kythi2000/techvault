@@ -2,7 +2,7 @@
 
 Status: working specification  
 Scope: public web application in `apps/web`  
-Last updated: 2026-09-18
+Last updated: 2026-09-19
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ The frontend turns the public catalog API into two connected experiences:
 1. **Archive utility** — find a device, inspect its technical record, and move between brands, categories, and eras.
 2. **Digital museum** — understand why an object mattered through editorial context and deliberate visual presentation.
 
-The public frontend consumes Backend Phases 1–6, including the four-device phone/computer catalog and the search/timeline endpoints. Comparison, media, collections, and admin experiences still depend on future backend contracts.
+The public frontend consumes Backend Phases 1–7, including the four-device catalog, search/timeline, and structured two-device comparison. Media and collections still depend on future backend contracts. Backend Phase 8 now supplies the protected content-management contract for the next frontend slice.
 
 ## 2. Product principles
 
@@ -59,7 +59,7 @@ Archive → exact technical record → verify unknown values → later compare/t
 | `/categories/{slug}` | Category overview and devices | Dynamic SSR | `GET /categories`, `/devices?category=` | Implemented |
 | `/search?q=...` | Full-text results in API relevance order | Dynamic SSR | `GET /search` | Implemented |
 | `/timeline` | Global/phone/computer/brand chronology via URL filters | Dynamic SSR + client scroll controls | `GET /timeline`, `/brands`, `/categories` | Implemented |
-| `/compare/*` | Two-device comparison | SSR + client selection | Backend Phase 7 | Phase 6 |
+| `/compare` | Ordered two-device comparison with URL state | Dynamic SSR + client selection | `GET /compare` | Implemented |
 | `/museum`, `/collections/*` | Curated stories | ISR | Future content APIs | Phase 7 |
 | `/admin/*` | Editorial CMS | Client-heavy, protected | Backend Phase 8 | Phase 8 |
 
@@ -321,13 +321,13 @@ Dependency satisfied by the current public brand/category/device APIs.
 
 Deliver `/search`, `/timeline`, dedicated query whitelists and API adapters, URL-driven GET forms, pagination, recoverable errors, empty states, metadata, and discovery links from home/navigation/catalog/taxonomy pages. The horizontal desktop timeline becomes a vertical sequence on mobile.
 
-Dependency satisfied by Backend Phase 6 search/timeline endpoints and Backend Phase 5 mixed sample data. FE Phase 6 comparison still requires Backend Phase 7.
+Dependency satisfied by Backend Phase 6 search/timeline endpoints and Backend Phase 5 mixed sample data. Comparison follows as a separate implemented slice below.
 
-### Phase 6 — Comparison
+### Phase 6 — Comparison — implemented
 
-Deliver a two-object compare tray, compatibility feedback, a server-rendered compare route, aligned specification groups, and explicit missing values.
+Deliver `/compare`, URL-ordered two-object selection, compatibility feedback, a server-rendered result table, aligned specification groups, differences-only mode, and explicit missing values. Device detail, primary navigation, and the footer provide entry points. A single valid `devices` slug preselects the first object without calling the comparison endpoint; a complete pair is passed to the backend unchanged.
 
-Dependency: Backend Phase 7 comparison contract.
+Dependency satisfied by Backend Phase 7 comparison contract and `AddCatalogComparisons`. The frontend preserves backend row/column order, validates two values per row, and never adds scoring, winners, unit conversion, or category-based compatibility inference.
 
 ### Phase 7 — Museum and collections
 

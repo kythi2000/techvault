@@ -1,6 +1,6 @@
 # TechVault Web
 
-The public Next.js frontend for the TechVault digital technology archive. Its current scope implements Frontend Phases 1–5: foundation, public catalog browse, device detail/specifications, taxonomy pages, and search/timeline backed by Backend Phase 6. See [the frontend specification](../../docs/FRONTEND_SPEC.md).
+The public Next.js frontend for the TechVault digital technology archive. Its current public scope implements Frontend Phases 1–6: foundation, catalog browse, device detail/specifications, taxonomy pages, search/timeline, and comparison backed by Backend Phases 1–7. See [the frontend specification](../../docs/FRONTEND_SPEC.md).
 
 ## Run locally
 
@@ -34,6 +34,16 @@ Apply the backend `AddCatalogDiscovery` migration and run the catalog seed as de
 - `/timeline?fromYear=1980&toYear=2000&pageSize=2` — year range with URL-preserving pagination.
 
 Search accepts `q`, `page`, and `pageSize`; timeline accepts brand/category/type/year/range/era filters and pagination. Forms reset the page when filters change. Timeline shows unknown exact dates explicitly and excludes records whose release year is unknown. Desktop supports native scrolling and Earlier/Later controls; mobile uses a vertical timeline.
+
+## Comparison
+
+Apply the backend `AddCatalogComparisons` migration before using comparison. Open `/compare`, or start from a device detail page. A completed comparison uses a shareable URL such as:
+
+```text
+/compare?devices=nokia-3310,nokia-3210&differencesOnly=true
+```
+
+The two slugs determine column order. Compatibility, comparable definitions, missing values, and differences come from the API; the frontend does not score devices or infer compatibility from categories.
 
 ## Quality checks
 

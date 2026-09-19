@@ -23,9 +23,10 @@ export async function generateMetadata({ searchParams }: PageProps<"/compare">):
 async function CompareContent({ searchParams }: PageProps<"/compare">) {
   const params = normalizeComparisonQuery(await searchParams);
   const selectedSlugs = params.devices?.split(",") ?? [];
+  const isPartialSelection = selectedSlugs.length === 1 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(selectedSlugs[0]);
   const [deviceOptions, result] = await Promise.all([
     getAllDevices(),
-    params.devices === undefined ? Promise.resolve(null) : compareDevices(params),
+    params.devices === undefined || isPartialSelection ? Promise.resolve(null) : compareDevices(params),
   ]);
 
   return (
@@ -72,4 +73,3 @@ async function CompareContent({ searchParams }: PageProps<"/compare">) {
 export default function ComparePage(props: PageProps<"/compare">) {
   return <Suspense fallback={<LoadingState />}><CompareContent {...props} /></Suspense>;
 }
-

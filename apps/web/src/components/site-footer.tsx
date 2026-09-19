@@ -19,6 +19,7 @@ export function SiteFooter() {
             <Link href="/devices">Full archive</Link>
             <Link href="/search">Search the archive</Link>
             <Link href="/timeline">Timeline</Link>
+            <Link href="/compare">Compare devices</Link>
             <Link href="/phones">Phones</Link>
             <Link href="/computers">Computers</Link>
             <Link href="/brands">Brands</Link>
@@ -26,7 +27,7 @@ export function SiteFooter() {
           </div>
           <div>
             <span>Project</span>
-            <span className="muted-link">Compare · planned</span>
+            <Link href="/compare">Structured comparison</Link>
             <span className="muted-link">Museum · planned</span>
           </div>
         </div>

@@ -1,6 +1,6 @@
 # TechVault
 
-A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–8 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, a chronological timeline, two-device comparisons, and protected content management. The Next.js app covers Frontend Phases 1–5 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, public browse routes, device detail/specifications, taxonomy pages, search, and a responsive timeline.
+A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–9 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, a chronological timeline, two-device comparisons, protected content management, and production-readiness controls. The Next.js app covers public Frontend Phases 1–6 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, browse/detail/taxonomy routes, search, a responsive timeline, and structured comparison.
 
 ## Frontend
 
@@ -14,7 +14,7 @@ npm run dev
 
 Open `http://localhost:3000`. `TECHVAULT_API_URL` defaults to `http://localhost:5078`; see [the web README](apps/web/README.md) for configuration and quality checks. When the catalog API is unavailable, the public shell still renders and data surfaces show an explicit unavailable state.
 
-With Backend Phase 6 migrated and running, open `/search?q=Nokia` or `/timeline?era=1990s`. Search and timeline keep their query, filters, and pagination in shareable URLs.
+With the current migrations applied and the API running, open `/search?q=Nokia`, `/timeline?era=1990s`, or `/compare?devices=nokia-3310,nokia-3210`. Discovery and comparison keep their state in shareable URLs.
 
 ## Local build and run
 

@@ -813,7 +813,7 @@ h1, h2, h3, dd, .trace { overflow-wrap: anywhere; }
   .taxonomy-collection .device-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1260px) {
   .primary-nav { display: none; }
   .mobile-nav { position: relative; display: block; }
   .mobile-nav summary {

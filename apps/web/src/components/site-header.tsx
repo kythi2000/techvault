@@ -9,6 +9,7 @@ const navigation = [
   { href: "/timeline", label: "Timeline" },
   { href: "/brands", label: "Brands" },
   { href: "/categories", label: "Categories" },
+  { href: "/compare", label: "Compare" },
   { href: "/search", label: "Search" },
 ] as const;
 

@@ -158,6 +158,7 @@ try {
   const home = await html("/");
   assert.match(home, /Technology has a/);
   assert.match(home, /Nokia 3310/);
+  assert.match(home, /href="\/compare"/);
   assert.doesNotMatch(home, /Frontend Phase|local catalog API/);
 
   const filtered = await html("/devices?brand=nokia&type=phones&year=2000&fromYear=1990&toYear=2009&sort=name-asc&pageSize=1");
@@ -188,6 +189,7 @@ try {
 
   const device = await html("/devices/nokia-3310");
   assert.match(device, /Test history, rendered on the server/);
+  assert.match(device, /href="\/compare\?devices=nokia-3310"/);
   assert.match(device, /href="\/brands\/nokia"/);
   assert.match(device, /href="\/categories\/feature-phones"/);
   assert.match(device, /<title>Nokia 3310 specifications and history \| TechVault<\/title>/);
@@ -258,6 +260,10 @@ try {
   assert.match(initialCompare, /Choose two objects/);
   assert.match(initialCompare, /name="robots" content="index, follow"/);
   assert.equal(comparisonRequests.length, 0, "Opening compare without devices must not call comparison API");
+  const comparisonRequestsBeforePartial = comparisonRequests.length;
+  const partialCompare = await html("/compare?devices=nokia-3310");
+  assert.match(partialCompare, /Choose two objects/);
+  assert.equal(comparisonRequests.length, comparisonRequestsBeforePartial, "A valid one-device entry point must wait for the second selection");
   const comparison = await html("/compare?devices=nokia-3310,nokia-3210");
   assert.ok(comparison.indexOf('href="/devices/nokia-3310">Nokia 3310') < comparison.indexOf('href="/devices/nokia-3210">Nokia 3210'), "Comparison columns must follow the requested order");
   assert.match(comparison, />No</);

@@ -6,6 +6,7 @@ import {
   apiResponseSchema,
   brandSchema,
   categorySchema,
+  comparisonResponseSchema,
   deviceCardSchema,
   deviceDetailSchema,
   paginatedResponseSchema,
@@ -13,12 +14,14 @@ import {
   type ApiError,
   type Brand,
   type Category,
+  type ComparisonResponse,
   type DeviceCard,
   type Pagination,
   type TimelineDevice,
 } from "./contracts.ts";
 import { toQuery, type BrowseParams, type BrowseRoute } from "./browse-query.ts";
 import { toSearchQuery, toTimelineQuery, type SearchParams, type TimelineParams } from "./discovery-query.ts";
+import { toComparisonQuery, type ComparisonParams } from "./comparison-query.ts";
 
 const apiBaseUrl = (
   process.env.TECHVAULT_API_URL ?? "http://localhost:5078"
@@ -26,7 +29,7 @@ const apiBaseUrl = (
 
 export type ApiResult<T> =
   | { ok: true; data: T; traceId: string | null }
-  | { ok: false; status: number; error: ApiError };
+  | { ok: false; status: number; error: ApiError; retryAfterSeconds?: number };
 
 export interface PaginatedData<T> {
   data: T[];
@@ -38,6 +41,14 @@ const unavailableError = (message: string, traceId = "frontend"): ApiError => ({
   message,
   traceId,
 });
+
+function retryAfterSeconds(response: Response): number | undefined {
+  const value = response.headers.get("retry-after");
+  if (value === null) return undefined;
+  if (/^\d+$/.test(value)) return Number(value);
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000));
+}
 
 async function request<T>(path: string, schema: z.ZodType<T>): Promise<ApiResult<T>> {
   let response: Response;
@@ -64,6 +75,7 @@ async function request<T>(path: string, schema: z.ZodType<T>): Promise<ApiResult
     return {
       ok: false,
       status: response.status,
+      ...(retryAfterSeconds(response) === undefined ? {} : { retryAfterSeconds: retryAfterSeconds(response) }),
       error: parsedError.success
         ? parsedError.data.error
         : unavailableError("The archive returned an unreadable error response.", traceId ?? undefined),
@@ -98,6 +110,29 @@ export function searchDevices(params: SearchParams): Promise<ApiResult<Paginated
 
 export function getTimeline(params: TimelineParams = {}): Promise<ApiResult<PaginatedData<TimelineDevice>>> {
   return request(`/api/v1/timeline${toTimelineQuery(params)}`, paginatedResponseSchema(timelineDeviceSchema));
+}
+
+export async function compareDevices(params: ComparisonParams): Promise<ApiResult<ComparisonResponse>> {
+  const result = await request(
+    `/api/v1/compare${toComparisonQuery(params)}`,
+    apiResponseSchema(comparisonResponseSchema),
+  );
+  return result.ok
+    ? { ok: true, data: result.data.data, traceId: result.traceId }
+    : result;
+}
+
+export async function getAllDevices(pageSize = 100): Promise<ApiResult<DeviceCard[]>> {
+  const items: DeviceCard[] = [];
+  for (let page = 1; page <= 10000; page++) {
+    const result = await browseDevices("/devices", { page: String(page), pageSize: String(pageSize) });
+    if (!result.ok) return result;
+    items.push(...result.data.data);
+    if (page >= result.data.pagination.totalPages) {
+      return { ok: true, data: items, traceId: result.traceId };
+    }
+  }
+  return { ok: false, status: 502, error: unavailableError("The device index is too large to load.") };
 }
 
 export const getDevice = cache((slug: string) =>

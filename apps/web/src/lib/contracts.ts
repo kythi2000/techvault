@@ -35,6 +35,59 @@ export const timelineDeviceSchema = deviceCardSchema.extend({
   releaseYear: z.number().int().min(1).max(9999),
 });
 
+export const comparisonGroupReferenceSchema = z.object({
+  id: idSchema,
+  key: z.string(),
+  name: z.string(),
+});
+
+export const comparisonValueSchema = z.object({
+  isMissing: z.boolean(),
+  valueText: z.string().nullable(),
+  valueNumber: z.number().nullable(),
+  valueBoolean: z.boolean().nullable(),
+  valueDate: dateSchema,
+}).refine((value) => {
+  const populated = [value.valueText, value.valueNumber, value.valueBoolean, value.valueDate]
+    .filter((item) => item !== null).length;
+  return value.isMissing ? populated === 0 : populated === 1;
+}, "A comparison value must be missing or contain exactly one typed value.");
+
+export const comparisonSpecificationSchema = z.object({
+  id: idSchema,
+  key: z.string(),
+  name: z.string(),
+  dataType: z.enum(["text", "number", "boolean", "date"]),
+  unit: z.string().nullable(),
+  displayOrder: z.number().int(),
+  isDifferent: z.boolean(),
+  values: z.array(comparisonValueSchema).length(2),
+}).refine((specification) => specification.values.every((value) => {
+  if (value.isMissing) return true;
+  const typedValue = {
+    text: value.valueText,
+    number: value.valueNumber,
+    boolean: value.valueBoolean,
+    date: value.valueDate,
+  }[specification.dataType];
+  return typedValue !== null;
+}), "Each present comparison value must match the specification data type.");
+
+export const comparisonSpecificationGroupSchema = z.object({
+  id: idSchema,
+  key: z.string(),
+  name: z.string(),
+  displayOrder: z.number().int(),
+  specifications: z.array(comparisonSpecificationSchema),
+});
+
+export const comparisonResponseSchema = z.object({
+  comparisonGroup: comparisonGroupReferenceSchema,
+  devices: z.array(deviceCardSchema).length(2),
+  differencesOnly: z.boolean(),
+  specificationGroups: z.array(comparisonSpecificationGroupSchema),
+});
+
 export const specificationSchema = z.object({
   id: idSchema,
   key: z.string(),
@@ -126,6 +179,10 @@ export const paginatedResponseSchema = <T extends z.ZodType>(item: T) =>
 
 export type DeviceCard = z.infer<typeof deviceCardSchema>;
 export type TimelineDevice = z.infer<typeof timelineDeviceSchema>;
+export type ComparisonValue = z.infer<typeof comparisonValueSchema>;
+export type ComparisonSpecification = z.infer<typeof comparisonSpecificationSchema>;
+export type ComparisonSpecificationGroup = z.infer<typeof comparisonSpecificationGroupSchema>;
+export type ComparisonResponse = z.infer<typeof comparisonResponseSchema>;
 export type DeviceDetail = z.infer<typeof deviceDetailSchema>;
 export type Specification = z.infer<typeof specificationSchema>;
 export type SpecificationGroup = z.infer<typeof specificationGroupSchema>;

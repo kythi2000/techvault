@@ -8,6 +8,40 @@ import { appleBrand, brand, card, category, computerCategory, detail, discoveryD
 let available = true;
 let referencesAvailable = true;
 const discoveryRequests = [];
+const comparisonRequests = [];
+const comparisonGroup = { id: "10101010-1010-4010-8010-101010101010", key: "phone", name: "Phones" };
+const comparisonRows = [{
+  id: "20202020-2020-4020-8020-202020202020",
+  key: "display",
+  name: "Display",
+  displayOrder: 10,
+  specifications: [
+    {
+      id: "30303030-3030-4030-8030-303030303030", key: "backlight", name: "Backlight",
+      dataType: "boolean", unit: null, displayOrder: 10, isDifferent: true,
+      values: [
+        { isMissing: false, valueText: null, valueNumber: null, valueBoolean: false, valueDate: null },
+        { isMissing: false, valueText: null, valueNumber: null, valueBoolean: true, valueDate: null },
+      ],
+    },
+    {
+      id: "40404040-4040-4040-8040-404040404040", key: "colors", name: "Colors",
+      dataType: "number", unit: "colors", displayOrder: 20, isDifferent: true,
+      values: [
+        { isMissing: false, valueText: null, valueNumber: 0, valueBoolean: null, valueDate: null },
+        { isMissing: true, valueText: null, valueNumber: null, valueBoolean: null, valueDate: null },
+      ],
+    },
+    {
+      id: "50505050-5050-4050-8050-505050505050", key: "network", name: "Network",
+      dataType: "text", unit: null, displayOrder: 30, isDifferent: false,
+      values: [
+        { isMissing: false, valueText: "GSM", valueNumber: null, valueBoolean: null, valueDate: null },
+        { isMissing: false, valueText: "GSM", valueNumber: null, valueBoolean: null, valueDate: null },
+      ],
+    },
+  ],
+}];
 const api = http.createServer((request, response) => {
   const url = new URL(request.url, "http://localhost");
   response.setHeader("Content-Type", "application/json");
@@ -17,6 +51,25 @@ const api = http.createServer((request, response) => {
     response.end(JSON.stringify({ error: { code, message: "Synthetic API error.", traceId: "smoke-trace" } }));
   };
   if (!available) return error(500, "UNEXPECTED_ERROR");
+  if (url.pathname === "/api/v1/compare") {
+    comparisonRequests.push(url);
+    if ([...url.searchParams.keys()].some((key) => !["devices", "differencesOnly"].includes(key))) return error(400, "VALIDATION_ERROR");
+    const raw = url.searchParams.get("devices") ?? "";
+    const slugs = raw.split(",");
+    if (slugs.length !== 2 || slugs[0] === slugs[1] || slugs.some((slug) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))) return error(400, "VALIDATION_ERROR");
+    if (slugs.includes("rate-limited")) {
+      response.setHeader("Retry-After", "60");
+      return error(429, "RATE_LIMITED");
+    }
+    const devices = slugs.map((slug) => discoveryDevices.find((device) => device.slug === slug));
+    if (devices.some((device) => !device)) return error(404, "DEVICE_NOT_FOUND");
+    if (devices[0].category.parentSlug !== devices[1].category.parentSlug) return error(400, "INCOMPATIBLE_DEVICES");
+    const differencesOnly = url.searchParams.get("differencesOnly") === "true";
+    const groups = differencesOnly
+      ? comparisonRows.map((group) => ({ ...group, specifications: group.specifications.filter((item) => item.isDifferent) }))
+      : comparisonRows;
+    return response.end(JSON.stringify({ data: { comparisonGroup, devices, differencesOnly, specificationGroups: groups } }));
+  }
   if (url.pathname === "/api/v1/devices/nokia-3310") return response.end(JSON.stringify({ data: detail }));
   if (url.pathname.startsWith("/api/v1/devices/")) return error(404, "DEVICE_NOT_FOUND");
   if (url.pathname === "/api/v1/brands") return referencesAvailable ? response.end(JSON.stringify(paged([brand, appleBrand], 1, 100))) : error(503, "REFERENCES_UNAVAILABLE");
@@ -61,7 +114,9 @@ const api = http.createServer((request, response) => {
   if (url.searchParams.get("page") === "abc") return error(400, "VALIDATION_ERROR");
   const page = Number(url.searchParams.get("page") ?? 1);
   const pageSize = Number(url.searchParams.get("pageSize") ?? 12);
-  let cards = [card, { ...card, id: "99999999-9999-4999-8999-999999999999", name: "Synthetic second object", slug: "test-second-object" }];
+  let cards = url.pathname === "/api/v1/devices" && pageSize === 100
+    ? discoveryDevices
+    : [card, { ...card, id: "99999999-9999-4999-8999-999999999999", name: "Synthetic second object", slug: "test-second-object" }];
   if (url.pathname === "/api/v1/computers") cards = discoveryDevices.filter((device) => device.brand.slug === "apple");
   if (url.searchParams.get("brand") === "unknown-brand") cards = [];
   response.end(JSON.stringify(paged(cards.slice((page - 1) * pageSize, page * pageSize), page, pageSize, cards.length)));
@@ -198,6 +253,27 @@ try {
   assert.match(partialTimeline, /value="nokia" selected=""/);
   assert.match(partialTimeline, /Nokia 3310/);
   referencesAvailable = true;
+
+  const initialCompare = await html("/compare");
+  assert.match(initialCompare, /Choose two objects/);
+  assert.match(initialCompare, /name="robots" content="index, follow"/);
+  assert.equal(comparisonRequests.length, 0, "Opening compare without devices must not call comparison API");
+  const comparison = await html("/compare?devices=nokia-3310,nokia-3210");
+  assert.ok(comparison.indexOf('href="/devices/nokia-3310">Nokia 3310') < comparison.indexOf('href="/devices/nokia-3210">Nokia 3210'), "Comparison columns must follow the requested order");
+  assert.match(comparison, />No</);
+  assert.match(comparison, />0 colors</);
+  assert.match(comparison, />Unknown</);
+  assert.match(comparison, /name="robots" content="noindex, follow"/);
+  const reversedComparison = await html("/compare?devices=nokia-3210,nokia-3310");
+  assert.ok(reversedComparison.indexOf('href="/devices/nokia-3210">Nokia 3210') < reversedComparison.indexOf('href="/devices/nokia-3310">Nokia 3310'), "Reversed request must reverse columns");
+  const differences = await html("/compare?devices=nokia-3310,nokia-3210&differencesOnly=true");
+  assert.doesNotMatch(differences, />Network</);
+  assert.match(await html("/compare?devices=nokia-3310,macintosh-128k"), /INCOMPATIBLE_DEVICES/);
+  assert.match(await html("/compare?devices=nokia-3310,missing-device"), /DEVICE_NOT_FOUND/);
+  assert.match(await html("/compare?devices=nokia-3310,nokia-3310"), /VALIDATION_ERROR/);
+  const rateLimited = await html("/compare?devices=rate-limited,nokia-3310");
+  assert.match(rateLimited, /RATE_LIMITED/);
+  assert.match(rateLimited, /60[\s\S]*seconds/);
 
   available = false;
   assert.match(await html("/devices"), /smoke-trace/);

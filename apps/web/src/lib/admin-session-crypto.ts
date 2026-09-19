@@ -20,7 +20,7 @@ export class AdminSessionConfigurationError extends Error {
   }
 }
 
-function decodeSecret(secret: string): Uint8Array {
+function decodeSecret(secret: string): ArrayBuffer {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(secret) || secret.length % 4 !== 0) {
     throw new AdminSessionConfigurationError();
   }
@@ -28,7 +28,9 @@ function decodeSecret(secret: string): Uint8Array {
   if (bytes.length !== 32 || bytes.toString("base64") !== secret) {
     throw new AdminSessionConfigurationError();
   }
-  return bytes;
+  const keyBytes = new Uint8Array(bytes.length);
+  keyBytes.set(bytes);
+  return keyBytes.buffer;
 }
 
 async function importSecret(secret: string): Promise<CryptoKey> {
@@ -74,4 +76,3 @@ export async function openAdminSession(token: string, secret: string, now = new 
     return null;
   }
 }
-

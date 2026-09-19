@@ -87,12 +87,18 @@
 .comparison-table thead a:hover { text-decoration-color: currentColor; }
 .comparison-table thead span { display: block; margin-top: 6px; color: var(--ink-soft); font-size: var(--text-small); font-weight: 400; }
 .comparison-group-row th { padding-block: 13px; background: var(--ink); color: var(--paper); font-family: var(--mono); font-size: var(--text-small); letter-spacing: 0.08em; text-transform: uppercase; }
-.comparison-table tbody tr:not(.comparison-group-row) th { background: var(--paper); font-weight: 600; }
+.comparison-table tbody tr:not(.comparison-group-row) th {
+  position: sticky;
+  z-index: 1;
+  left: 0;
+  background: var(--paper);
+  font-weight: 600;
+}
 .comparison-table tbody tr.is-different th { box-shadow: inset 4px 0 0 var(--signal); }
 .comparison-table tbody th small { display: block; margin-top: 6px; color: var(--signal-dark); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; }
 .comparison-table td { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .comparison-table td.is-missing { color: var(--ink-soft); font-style: normal; }
-.comparison-empty { margin-top: 0; }
+.comparison-empty { margin: 0; border: 0; border-top: 1px solid var(--line); }
 .comparison-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 20px; }
 
 @media (max-width: 820px) {

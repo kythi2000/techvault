@@ -19,16 +19,6 @@ function formatValue(specification: ComparisonSpecification, value: ComparisonVa
 export function ComparisonTable({ comparison }: { comparison: ComparisonResponse }) {
   const [left, right] = comparison.devices;
 
-  if (comparison.specificationGroups.length === 0) {
-    return (
-      <div className="empty-state comparison-empty">
-        <span>NO ROWS TO DISPLAY</span>
-        <h2>No differing comparable values remain.</h2>
-        <p>Both object headers stay visible. Turn off “differences only” to inspect all comparable fields.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="comparison-table-scroll" role="region" aria-label="Device specification comparison" tabIndex={0}>
       <table className="comparison-table">
@@ -59,7 +49,15 @@ export function ComparisonTable({ comparison }: { comparison: ComparisonResponse
           </tbody>
         ))}
       </table>
+      {comparison.specificationGroups.length === 0 && (
+        <div className="empty-state comparison-empty">
+          <span>NO ROWS TO DISPLAY</span>
+          <h2>{comparison.differencesOnly ? "No differing comparable values remain." : "No comparable values are available."}</h2>
+          <p>{comparison.differencesOnly
+            ? "Both object headers stay visible. Turn off “differences only” to inspect all comparable fields."
+            : "Both object headers stay visible, but neither record has a value for a comparable definition."}</p>
+        </div>
+      )}
     </div>
   );
 }
-

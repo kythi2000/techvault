@@ -65,8 +65,10 @@ const api = http.createServer((request, response) => {
     if (devices.some((device) => !device)) return error(404, "DEVICE_NOT_FOUND");
     if (devices[0].category.parentSlug !== devices[1].category.parentSlug) return error(400, "INCOMPATIBLE_DEVICES");
     const differencesOnly = url.searchParams.get("differencesOnly") === "true";
-    const groups = differencesOnly
-      ? comparisonRows.map((group) => ({ ...group, specifications: group.specifications.filter((item) => item.isDifferent) }))
+    const groups = differencesOnly && devices[0].category.parentSlug === "computers"
+      ? []
+      : differencesOnly
+        ? comparisonRows.map((group) => ({ ...group, specifications: group.specifications.filter((item) => item.isDifferent) }))
       : comparisonRows;
     return response.end(JSON.stringify({ data: { comparisonGroup, devices, differencesOnly, specificationGroups: groups } }));
   }
@@ -274,6 +276,10 @@ try {
   assert.ok(reversedComparison.indexOf('href="/devices/nokia-3210">Nokia 3210') < reversedComparison.indexOf('href="/devices/nokia-3310">Nokia 3310'), "Reversed request must reverse columns");
   const differences = await html("/compare?devices=nokia-3310,nokia-3210&differencesOnly=true");
   assert.doesNotMatch(differences, />Network</);
+  const emptyDifferences = await html("/compare?devices=macintosh-128k,imac-g3&differencesOnly=true");
+  assert.match(emptyDifferences, /href="\/devices\/macintosh-128k">Macintosh 128K/);
+  assert.match(emptyDifferences, /href="\/devices\/imac-g3">iMac G3/);
+  assert.match(emptyDifferences, /No differing comparable values remain/);
   assert.match(await html("/compare?devices=nokia-3310,macintosh-128k"), /INCOMPATIBLE_DEVICES/);
   assert.match(await html("/compare?devices=nokia-3310,missing-device"), /DEVICE_NOT_FOUND/);
   assert.match(await html("/compare?devices=nokia-3310,nokia-3310"), /VALIDATION_ERROR/);

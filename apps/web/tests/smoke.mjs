@@ -9,6 +9,8 @@ let available = true;
 let referencesAvailable = true;
 const discoveryRequests = [];
 const comparisonRequests = [];
+const adminKey = "smoke-admin-key-01234567890123456789";
+const adminSessionSecret = Buffer.alloc(32, 9).toString("base64");
 const comparisonGroup = { id: "10101010-1010-4010-8010-101010101010", key: "phone", name: "Phones" };
 const comparisonRows = [{
   id: "20202020-2020-4020-8020-202020202020",
@@ -51,6 +53,13 @@ const api = http.createServer((request, response) => {
     response.end(JSON.stringify({ error: { code, message: "Synthetic API error.", traceId: "smoke-trace" } }));
   };
   if (!available) return error(500, "UNEXPECTED_ERROR");
+  if (url.pathname.startsWith("/api/v1/admin/")) {
+    if (request.headers.authorization !== `Bearer ${adminKey}`) return error(401, "UNAUTHORIZED");
+    if (url.pathname === "/api/v1/admin/devices" && request.method === "GET") {
+      return response.end(JSON.stringify(paged([], Number(url.searchParams.get("page") ?? 1), Number(url.searchParams.get("pageSize") ?? 24), 0)));
+    }
+    return error(404, "ADMIN_RESOURCE_NOT_FOUND");
+  }
   if (url.pathname === "/api/v1/compare") {
     comparisonRequests.push(url);
     if ([...url.searchParams.keys()].some((key) => !["devices", "differencesOnly"].includes(key))) return error(400, "VALIDATION_ERROR");
@@ -135,7 +144,12 @@ await new Promise((resolve) => portProbe.close(resolve));
 
 const web = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(webPort)], {
   cwd: new URL("..", import.meta.url),
-  env: { ...process.env, TECHVAULT_API_URL: `http://127.0.0.1:${apiPort}`, NEXT_PUBLIC_SITE_URL: "http://localhost:3000" },
+  env: {
+    ...process.env,
+    TECHVAULT_API_URL: `http://127.0.0.1:${apiPort}`,
+    NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
+    TECHVAULT_ADMIN_SESSION_SECRET: adminSessionSecret,
+  },
   windowsHide: true,
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -148,6 +162,41 @@ async function html(path, status = 200) {
   const response = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(15000) });
   assert.equal(response.status, status, path);
   return (await response.text()).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, "");
+}
+
+function actionFields(page) {
+  const form = page.match(/<form\b[^>]*>[\s\S]*?<\/form>/)?.[0];
+  assert.ok(form, "Server Action form must be rendered");
+  const fields = {};
+  for (const match of form.matchAll(/<input type="hidden" name="([^"]+)"(?: value="([^"]*)")?\/>/g)) {
+    fields[match[1]] = (match[2] ?? "")
+      .replaceAll("&quot;", '"')
+      .replaceAll("&amp;", "&")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">");
+  }
+  assert.ok(Object.keys(fields).some((name) => name.startsWith("$ACTION_")), "Server Action fields must be rendered");
+  return fields;
+}
+
+async function submit(path, fields, cookie) {
+  const pageResponse = await fetch(`${base}${path}`, {
+    headers: cookie ? { Cookie: cookie } : {},
+    signal: AbortSignal.timeout(15000),
+  });
+  assert.equal(pageResponse.status, 200, path);
+  const page = await pageResponse.text();
+  const body = new FormData();
+  for (const [name, value] of Object.entries({ ...actionFields(page), ...fields })) body.set(name, value);
+  return fetch(`${base}${path}`, {
+    method: "POST",
+    headers: {
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body,
+    redirect: "manual",
+    signal: AbortSignal.timeout(15000),
+  });
 }
 
 try {
@@ -286,6 +335,29 @@ try {
   const rateLimited = await html("/compare?devices=rate-limited,nokia-3310");
   assert.match(rateLimited, /RATE_LIMITED/);
   assert.match(rateLimited, /60[\s\S]*seconds/);
+
+  const login = await html("/admin");
+  assert.match(login, /Unlock the editorial workspace/);
+  assert.match(login, /name="robots" content="noindex, nofollow"/);
+  const rejectedLogin = await submit("/admin/login", { apiKey: "wrong-key" });
+  assert.equal(rejectedLogin.status, 200);
+  assert.match(await rejectedLogin.text(), /UNAUTHORIZED/);
+  const acceptedLogin = await submit("/admin/login", { apiKey: adminKey });
+  assert.equal(acceptedLogin.status, 303);
+  assert.equal(acceptedLogin.headers.get("location"), "/admin");
+  const adminCookie = acceptedLogin.headers.get("set-cookie");
+  assert.match(adminCookie, /HttpOnly/);
+  assert.match(adminCookie, /SameSite=Strict/i);
+  assert.doesNotMatch((await acceptedLogin.text()) + logs, new RegExp(adminKey));
+  const dashboardResponse = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie }, redirect: "manual" });
+  assert.equal(dashboardResponse.status, 200);
+  const dashboard = await dashboardResponse.text();
+  assert.match(dashboard, /Editorial dashboard/);
+  assert.match(dashboard, /Devices/);
+  const logout = await submit("/admin", {}, adminCookie);
+  assert.equal(logout.status, 303);
+  assert.equal(logout.headers.get("location"), "/admin/login");
+  assert.match(logout.headers.get("set-cookie"), /(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/);
 
   available = false;
   assert.match(await html("/devices"), /smoke-trace/);

@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import {
   ADMIN_SESSION_TTL_SECONDS,
   AdminSessionConfigurationError,
@@ -43,3 +44,8 @@ export async function clearAdminSession(): Promise<void> {
   (await cookies()).delete(COOKIE_NAME);
 }
 
+export async function requireAdminSession(): Promise<AdminSessionPayload> {
+  const session = await readAdminSession();
+  if (!session) redirect("/admin/login");
+  return session;
+}

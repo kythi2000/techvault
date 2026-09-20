@@ -256,3 +256,32 @@ export async function adminListComparisonGroups(
   return adminRequest(apiKey, `/api/v1/admin/comparison-groups${listQuery(params)}`,
     adminPagedResponseSchema(adminComparisonGroupSchema));
 }
+
+export async function adminGetAllReferences(
+  apiKey: string,
+  kind: AdminReferenceKind,
+): Promise<AdminResult<AdminReference[]>> {
+  const items: AdminReference[] = [];
+  let traceId: string | null = null;
+  for (let page = 1; page <= 10000; page++) {
+    const result = await adminListReferences(apiKey, kind, { page: String(page), pageSize: "100" });
+    if (!result.ok) return result;
+    items.push(...result.data.data);
+    traceId = result.traceId;
+    if (page >= result.data.pagination.totalPages) return { ok: true, data: items, traceId };
+  }
+  return { ok: false, status: 502, error: unavailable("The admin reference index is too large to load.") };
+}
+
+export async function adminGetAllComparisonGroups(apiKey: string): Promise<AdminResult<AdminComparisonGroup[]>> {
+  const items: AdminComparisonGroup[] = [];
+  let traceId: string | null = null;
+  for (let page = 1; page <= 10000; page++) {
+    const result = await adminListComparisonGroups(apiKey, { page: String(page), pageSize: "100" });
+    if (!result.ok) return result;
+    items.push(...result.data.data);
+    traceId = result.traceId;
+    if (page >= result.data.pagination.totalPages) return { ok: true, data: items, traceId };
+  }
+  return { ok: false, status: 502, error: unavailable("The comparison group index is too large to load.") };
+}

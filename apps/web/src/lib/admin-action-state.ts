@@ -1,6 +1,9 @@
 import type { AdminResult } from "./admin-api.ts";
 
 export type AdminActionState = {
+  ok: true;
+  message: string;
+} | {
   ok: false;
   code: string;
   message: string;

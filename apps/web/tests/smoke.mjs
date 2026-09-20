@@ -10,8 +10,32 @@ let referencesAvailable = true;
 const discoveryRequests = [];
 const comparisonRequests = [];
 const adminKey = "smoke-admin-key-01234567890123456789";
+const adminRequests = [];
 const adminSessionSecret = Buffer.alloc(32, 9).toString("base64");
 const comparisonGroup = { id: "10101010-1010-4010-8010-101010101010", key: "phone", name: "Phones" };
+const adminNow = "2026-09-19T00:00:00+00:00";
+const adminGroups = [{ id: "55555555-5555-4555-8555-555555555555", name: "Core specifications", key: "core", displayOrder: 10 }];
+const adminDefinitions = [
+  { id: "77777777-7777-4777-8777-777777777777", name: "Feature enabled", key: "feature_enabled", groupId: adminGroups[0].id, dataType: "boolean", displayOrder: 10, unit: null, isComparable: true },
+  { id: "88888888-8888-4888-8888-888888888888", name: "Test zero", key: "test_zero", groupId: adminGroups[0].id, dataType: "number", displayOrder: 20, unit: "mm", isComparable: true },
+];
+const adminBrands = [{ id: brand.id, name: brand.name, slug: brand.slug, description: brand.description }];
+const adminCategories = [{ id: category.id, name: category.name, slug: category.slug, description: category.description, displayOrder: category.displayOrder, parentCategoryId: category.parentCategoryId }];
+const adminComparisonGroups = [comparisonGroup];
+const adminDevices = [{
+  id: card.id,
+  status: "draft",
+  content: {
+    name: card.name, slug: card.slug, brandId: brand.id, categoryId: category.id, comparisonGroupId: comparisonGroup.id,
+    shortDescription: card.shortDescription, description: detail.description, history: detail.history,
+    seoTitle: detail.seoTitle, seoDescription: detail.seoDescription, modelNumber: null, aliases: [],
+    releaseYear: 2000, releaseDate: null, discontinuedDate: null, heightMm: null, widthMm: null, depthMm: null, weightGrams: 133,
+  },
+  createdAt: adminNow,
+  updatedAt: adminNow,
+  publishedAt: null,
+  specifications: [],
+}];
 const comparisonRows = [{
   id: "20202020-2020-4020-8020-202020202020",
   key: "display",
@@ -44,7 +68,7 @@ const comparisonRows = [{
     },
   ],
 }];
-const api = http.createServer((request, response) => {
+const api = http.createServer(async (request, response) => {
   const url = new URL(request.url, "http://localhost");
   response.setHeader("Content-Type", "application/json");
   response.setHeader("X-Trace-Id", "smoke-trace");
@@ -52,11 +76,84 @@ const api = http.createServer((request, response) => {
     response.statusCode = status;
     response.end(JSON.stringify({ error: { code, message: "Synthetic API error.", traceId: "smoke-trace" } }));
   };
+  const readJson = async () => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  };
+  const state = (device) => ({ id: device.id, slug: device.content.slug, status: device.status, updatedAt: device.updatedAt, publishedAt: device.publishedAt });
+  const summary = (device) => ({
+    id: device.id, name: device.content.name, slug: device.content.slug, status: device.status,
+    brandId: device.content.brandId, categoryId: device.content.categoryId,
+    comparisonGroupId: device.content.comparisonGroupId, updatedAt: device.updatedAt,
+  });
   if (!available) return error(500, "UNEXPECTED_ERROR");
   if (url.pathname.startsWith("/api/v1/admin/")) {
+    adminRequests.push(`${request.method} ${url.pathname}${url.search}`);
     if (request.headers.authorization !== `Bearer ${adminKey}`) return error(401, "UNAUTHORIZED");
     if (url.pathname === "/api/v1/admin/devices" && request.method === "GET") {
-      return response.end(JSON.stringify(paged([], Number(url.searchParams.get("page") ?? 1), Number(url.searchParams.get("pageSize") ?? 24), 0)));
+      const page = Number(url.searchParams.get("page") ?? 1);
+      const pageSize = Number(url.searchParams.get("pageSize") ?? 24);
+      const status = url.searchParams.get("status");
+      const devices = status ? adminDevices.filter((device) => device.status === status) : adminDevices;
+      return response.end(JSON.stringify(paged(devices.map(summary).slice((page - 1) * pageSize, page * pageSize), page, pageSize, devices.length)));
+    }
+    if (url.pathname === "/api/v1/admin/devices" && request.method === "POST") {
+      const content = await readJson();
+      const device = { id: "90909090-9090-4090-8090-909090909090", status: "draft", content, createdAt: adminNow, updatedAt: adminNow, publishedAt: null, specifications: [] };
+      adminDevices.push(device);
+      response.statusCode = 201;
+      return response.end(JSON.stringify({ data: state(device) }));
+    }
+    const deviceMatch = url.pathname.match(/^\/api\/v1\/admin\/devices\/([0-9a-f-]+)$/);
+    if (deviceMatch) {
+      const device = adminDevices.find((item) => item.id === deviceMatch[1]);
+      if (!device) return error(404, "ADMIN_RESOURCE_NOT_FOUND");
+      if (request.method === "GET") return response.end(JSON.stringify({ data: device }));
+      if (request.method === "PUT") {
+        if (device.status === "archived") return error(409, "CATALOG_CONFLICT");
+        device.content = await readJson();
+        return response.end(JSON.stringify({ data: state(device) }));
+      }
+    }
+    const lifecycleMatch = url.pathname.match(/^\/api\/v1\/admin\/devices\/([0-9a-f-]+)\/(publish|unpublish|archive)$/);
+    if (lifecycleMatch && request.method === "POST") {
+      const device = adminDevices.find((item) => item.id === lifecycleMatch[1]);
+      if (!device) return error(404, "ADMIN_RESOURCE_NOT_FOUND");
+      const action = lifecycleMatch[2];
+      if (device.status === "archived" && action !== "archive") return error(409, "CATALOG_CONFLICT");
+      device.status = action === "publish" ? "published" : action === "unpublish" ? "draft" : "archived";
+      device.publishedAt = device.status === "published" ? adminNow : null;
+      return response.end(JSON.stringify({ data: state(device) }));
+    }
+    const specificationMatch = url.pathname.match(/^\/api\/v1\/admin\/devices\/([0-9a-f-]+)\/specifications\/([0-9a-f-]+)$/);
+    if (specificationMatch) {
+      const device = adminDevices.find((item) => item.id === specificationMatch[1]);
+      const definition = adminDefinitions.find((item) => item.id === specificationMatch[2]);
+      if (!device || !definition) return error(404, "ADMIN_RESOURCE_NOT_FOUND");
+      if (device.status === "archived") return error(409, "CATALOG_CONFLICT");
+      if (request.method === "PUT") {
+        const value = await readJson();
+        device.specifications = device.specifications.filter((item) => item.definitionId !== definition.id);
+        device.specifications.push({
+          definitionId: definition.id, key: definition.key, dataType: definition.dataType, unit: definition.unit,
+          valueText: null, valueNumber: null, valueBoolean: null, valueDate: null, ...value,
+        });
+      } else if (request.method === "DELETE") {
+        device.specifications = device.specifications.filter((item) => item.definitionId !== definition.id);
+      }
+      return response.end(JSON.stringify({ data: state(device) }));
+    }
+    const adminLists = {
+      "/api/v1/admin/brands": adminBrands,
+      "/api/v1/admin/categories": adminCategories,
+      "/api/v1/admin/specification-groups": adminGroups,
+      "/api/v1/admin/specification-definitions": adminDefinitions,
+      "/api/v1/admin/comparison-groups": adminComparisonGroups,
+    };
+    if (request.method === "GET" && adminLists[url.pathname]) {
+      const values = adminLists[url.pathname];
+      return response.end(JSON.stringify(paged(values, 1, Number(url.searchParams.get("pageSize") ?? 24), values.length)));
     }
     return error(404, "ADMIN_RESOURCE_NOT_FOUND");
   }
@@ -164,8 +261,9 @@ async function html(path, status = 200) {
   return (await response.text()).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, "");
 }
 
-function actionFields(page) {
-  const form = page.match(/<form\b[^>]*>[\s\S]*?<\/form>/)?.[0];
+function actionFields(page, marker) {
+  const forms = [...page.matchAll(/<form\b[^>]*>[\s\S]*?<\/form>/g)].map((match) => match[0]);
+  const form = marker ? forms.find((candidate) => candidate.includes(marker)) : forms[0];
   assert.ok(form, "Server Action form must be rendered");
   const fields = {};
   for (const match of form.matchAll(/<input type="hidden" name="([^"]+)"(?: value="([^"]*)")?\/>/g)) {
@@ -179,7 +277,7 @@ function actionFields(page) {
   return fields;
 }
 
-async function submit(path, fields, cookie) {
+async function submit(path, fields, cookie, marker) {
   const pageResponse = await fetch(`${base}${path}`, {
     headers: cookie ? { Cookie: cookie } : {},
     signal: AbortSignal.timeout(15000),
@@ -187,16 +285,21 @@ async function submit(path, fields, cookie) {
   assert.equal(pageResponse.status, 200, path);
   const page = await pageResponse.text();
   const body = new FormData();
-  for (const [name, value] of Object.entries({ ...actionFields(page), ...fields })) body.set(name, value);
-  return fetch(`${base}${path}`, {
-    method: "POST",
-    headers: {
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(15000),
-  });
+  for (const [name, value] of Object.entries({ ...actionFields(page, marker), ...fields })) body.set(name, value);
+  try {
+    return await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: {
+        Origin: base,
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    throw new Error(`Admin form request timed out at ${path}. Recent API requests: ${adminRequests.slice(-12).join(" | ")}. Server logs: ${logs.slice(-1000)}`, { cause: error });
+  }
 }
 
 try {
@@ -354,6 +457,74 @@ try {
   const dashboard = await dashboardResponse.text();
   assert.match(dashboard, /Editorial dashboard/);
   assert.match(dashboard, /Devices/);
+
+  const deviceFields = {
+    name: "Editorial test device", slug: "editorial-test-device", brandId: brand.id, categoryId: category.id,
+    comparisonGroupId: comparisonGroup.id, shortDescription: "A complete editorial summary.",
+    description: "A complete editorial description.", history: "A complete editorial history.",
+    seoTitle: "Editorial test device | TechVault", seoDescription: "Editorial SEO description.",
+    modelNumber: "MODEL-0", aliases: "First alias\nSecond alias", releaseYear: "2001", releaseDate: "",
+    discontinuedDate: "", heightMm: "0.125", widthMm: "", depthMm: "", weightGrams: "1.5",
+  };
+  const deviceList = await fetch(`${base}/admin/devices`, { headers: { Cookie: adminCookie } });
+  assert.equal(deviceList.status, 200);
+  assert.match(await deviceList.text(), /Nokia 3310/);
+  const createdDevice = await submit("/admin/devices/new", deviceFields, adminCookie, 'value="device-editor"');
+  assert.equal(createdDevice.status, 303);
+  assert.equal(createdDevice.headers.get("location"), "/admin/devices/90909090-9090-4090-8090-909090909090");
+  assert.equal(adminDevices.at(-1).content.heightMm, 0.125);
+  const editDevice = await fetch(`${base}/admin/devices/90909090-9090-4090-8090-909090909090`, { headers: { Cookie: adminCookie } });
+  const editDeviceHtml = await editDevice.text();
+  assert.match(editDeviceHtml, /Editorial test device/);
+  assert.match(editDeviceHtml, /Draft/);
+  const updatedDevice = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { ...deviceFields, name: "Editorial device revised" }, adminCookie, 'value="device-editor"',
+  );
+  assert.equal(updatedDevice.status, 303);
+  assert.equal(adminDevices.at(-1).content.name, "Editorial device revised");
+  const falseSpecification = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { dataType: "boolean", valueBoolean: "false" },
+    adminCookie,
+    `value="${adminDefinitions[0].id}"`,
+  );
+  assert.equal(falseSpecification.status, 303);
+  assert.equal(adminDevices.at(-1).specifications[0].valueBoolean, false);
+  const zeroSpecification = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { dataType: "number", valueNumber: "0" },
+    adminCookie,
+    `value="${adminDefinitions[1].id}"`,
+  );
+  assert.equal(zeroSpecification.status, 303);
+  assert.equal(adminDevices.at(-1).specifications[1].valueNumber, 0);
+  const publishedDevice = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { intent: "publish" }, adminCookie, 'value="lifecycle"',
+  );
+  assert.equal(publishedDevice.status, 303);
+  assert.equal(adminDevices.at(-1).status, "published");
+  const refusedArchive = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { intent: "archive" }, adminCookie, 'value="lifecycle"',
+  );
+  assert.equal(refusedArchive.status, 303);
+  const refusedArchivePage = await fetch(new URL(refusedArchive.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  assert.match(await refusedArchivePage.text(), /CONFIRMATION_REQUIRED/);
+  const archivedDevice = await submit(
+    "/admin/devices/90909090-9090-4090-8090-909090909090",
+    { intent: "archive", confirmArchive: "yes" }, adminCookie, 'value="lifecycle"',
+  );
+  assert.equal(archivedDevice.status, 303);
+  assert.equal(adminDevices.at(-1).status, "archived");
+  const archivedPage = await fetch(`${base}/admin/devices/90909090-9090-4090-8090-909090909090`, { headers: { Cookie: adminCookie } });
+  const archivedHtml = await archivedPage.text();
+  assert.match(archivedHtml, /Archived/);
+  assert.doesNotMatch(archivedHtml, />Save device</);
+  const archivedList = await fetch(`${base}/admin/devices?status=archived`, { headers: { Cookie: adminCookie } });
+  assert.match(await archivedList.text(), /Editorial device revised/);
+
   const logout = await submit("/admin", {}, adminCookie);
   assert.equal(logout.status, 303);
   assert.equal(logout.headers.get("location"), "/admin/login");

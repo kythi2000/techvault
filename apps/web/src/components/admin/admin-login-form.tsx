@@ -5,7 +5,7 @@ import { loginAction } from "@/app/admin/actions";
 import { AdminActionMessage } from "./admin-action-message";
 
 export function AdminLoginForm() {
-  const [state, formAction, pending] = useActionState(loginAction, null);
+  const [state, formAction, pending] = useActionState(loginAction, null, "/admin/login");
 
   return (
     <form action={formAction} className="admin-login-form">

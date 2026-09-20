@@ -250,6 +250,27 @@ body:has(.admin-root) > #main-content { min-height: 100vh; }
 .admin-spec-readonly { display: grid; gap: 1px; background: #c5c9c1; }
 .admin-spec-readonly > div { display: flex; justify-content: space-between; gap: 20px; padding: 12px 15px; background: #fff; }
 
+.admin-create-reference { margin-top: 35px; border: 1px solid #9fa59e; background: #fff; }
+.admin-create-reference > summary { padding: 16px 20px; cursor: pointer; font-weight: 700; }
+.admin-create-reference[open] > summary { border-bottom: 1px solid #d1d4cd; }
+.admin-create-reference > .admin-reference-form { padding: 24px; }
+.admin-reference-list { display: grid; gap: 18px; margin-top: 30px; }
+.admin-reference-card { border: 1px solid #c5c9c1; padding: 24px; background: #fff; }
+.admin-reference-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 22px; border-bottom: 1px solid #daddd6; padding-bottom: 18px; }
+.admin-reference-card h2 { margin: 0; font-size: 1.35rem; }
+.admin-reference-card code { color: #666f6b; font-family: var(--mono); font-size: 0.7rem; }
+.admin-reference-card > header > code { overflow-wrap: anywhere; text-align: right; }
+.admin-reference-form { display: grid; gap: 18px; }
+.admin-reference-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.admin-reference-fields label { display: grid; align-content: start; gap: 7px; color: #3f4945; font-size: 0.8rem; font-weight: 700; }
+.admin-reference-fields label > span { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.admin-reference-fields label small { border: 1px solid #aab0a8; padding: 2px 5px; color: #69716d; font-size: 0.6rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.admin-reference-wide { grid-column: 1 / -1; }
+.admin-reference-form > .admin-button { justify-self: start; }
+.admin-reference-delete { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 20px; border-top: 1px solid #daddd6; padding-top: 16px; }
+.admin-reference-delete > button { margin-left: auto; border: 0; background: none; color: #943a29; cursor: pointer; font-size: 0.78rem; text-decoration: underline; }
+.admin-reference-delete .admin-action-message { width: 100%; }
+
 @media (max-width: 850px) {
   .admin-workspace { grid-template-columns: 1fr; }
   .admin-sidebar { position: static; height: auto; padding: 18px; }
@@ -277,4 +298,9 @@ body:has(.admin-root) > #main-content { min-height: 100vh; }
   .admin-table td:nth-child(3),
   .admin-table th:nth-child(4),
   .admin-table td:nth-child(4) { display: none; }
+  .admin-reference-fields { grid-template-columns: 1fr; }
+  .admin-reference-wide { grid-column: auto; }
+  .admin-reference-card { padding: 18px; }
+  .admin-reference-card > header { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .admin-reference-card > header > code { text-align: left; }
 }

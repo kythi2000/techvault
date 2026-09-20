@@ -20,7 +20,10 @@ const adminDefinitions = [
   { id: "88888888-8888-4888-8888-888888888888", name: "Test zero", key: "test_zero", groupId: adminGroups[0].id, dataType: "number", displayOrder: 20, unit: "mm", isComparable: true },
 ];
 const adminBrands = [{ id: brand.id, name: brand.name, slug: brand.slug, description: brand.description }];
-const adminCategories = [{ id: category.id, name: category.name, slug: category.slug, description: category.description, displayOrder: category.displayOrder, parentCategoryId: category.parentCategoryId }];
+const adminCategories = [
+  { id: "33333333-3333-4333-8333-333333333333", name: "Phones", slug: "phones", description: "Phone root", displayOrder: 0, parentCategoryId: null },
+  { id: category.id, name: category.name, slug: category.slug, description: category.description, displayOrder: category.displayOrder, parentCategoryId: category.parentCategoryId },
+];
 const adminComparisonGroups = [comparisonGroup];
 const adminDevices = [{
   id: card.id,
@@ -153,7 +156,33 @@ const api = http.createServer(async (request, response) => {
     };
     if (request.method === "GET" && adminLists[url.pathname]) {
       const values = adminLists[url.pathname];
-      return response.end(JSON.stringify(paged(values, 1, Number(url.searchParams.get("pageSize") ?? 24), values.length)));
+      const page = Number(url.searchParams.get("page") ?? 1);
+      const pageSize = Number(url.searchParams.get("pageSize") ?? 24);
+      return response.end(JSON.stringify(paged(values.slice((page - 1) * pageSize, page * pageSize), page, pageSize, values.length)));
+    }
+    if (request.method === "POST" && adminLists[url.pathname]) {
+      const values = adminLists[url.pathname];
+      const input = await readJson();
+      const item = { id: "12121212-1212-4212-8212-121212121212", ...input };
+      values.push(item);
+      response.statusCode = 201;
+      return response.end(JSON.stringify({ data: item }));
+    }
+    const referenceMatch = url.pathname.match(/^\/api\/v1\/admin\/(brands|categories|specification-groups|specification-definitions)\/([0-9a-f-]+)$/);
+    if (referenceMatch) {
+      const values = adminLists[`/api/v1/admin/${referenceMatch[1]}`];
+      const index = values.findIndex((item) => item.id === referenceMatch[2]);
+      if (index < 0) return error(404, "ADMIN_RESOURCE_NOT_FOUND");
+      if (request.method === "GET") return response.end(JSON.stringify({ data: values[index] }));
+      if (request.method === "PUT") {
+        values[index] = { id: values[index].id, ...await readJson() };
+        return response.end(JSON.stringify({ data: values[index] }));
+      }
+      if (request.method === "DELETE") {
+        if (referenceMatch[1] === "brands" && referenceMatch[2] === brand.id) return error(409, "REFERENCE_CONFLICT");
+        const [deleted] = values.splice(index, 1);
+        return response.end(JSON.stringify({ data: { id: deleted.id } }));
+      }
     }
     return error(404, "ADMIN_RESOURCE_NOT_FOUND");
   }
@@ -524,6 +553,49 @@ try {
   assert.doesNotMatch(archivedHtml, />Save device</);
   const archivedList = await fetch(`${base}/admin/devices?status=archived`, { headers: { Cookie: adminCookie } });
   assert.match(await archivedList.text(), /Editorial device revised/);
+
+  const brandsPage = await fetch(`${base}/admin/references/brands`, { headers: { Cookie: adminCookie } });
+  assert.equal(brandsPage.status, 200);
+  assert.match(await brandsPage.text(), /Nokia/);
+  const createdBrand = await submit(
+    "/admin/references/brands",
+    { name: "Test maker", slug: "test-maker", description: "Created by the admin smoke workflow." },
+    adminCookie,
+    'value="reference-create"',
+  );
+  assert.equal(createdBrand.status, 303);
+  assert.ok(adminBrands.some((item) => item.slug === "test-maker"));
+  const updatedBrand = await submit(
+    "/admin/references/brands",
+    { name: "Test maker revised", slug: "test-maker", description: "Updated." },
+    adminCookie,
+    'value="reference-edit-12121212-1212-4212-8212-121212121212"',
+  );
+  assert.equal(updatedBrand.status, 303);
+  assert.equal(adminBrands.find((item) => item.slug === "test-maker").name, "Test maker revised");
+  const brandConflict = await submit(
+    "/admin/references/brands",
+    { confirmDelete: "yes" }, adminCookie, `value="reference-delete-${brand.id}"`,
+  );
+  assert.equal(brandConflict.status, 303);
+  const conflictPage = await fetch(new URL(brandConflict.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  assert.match(await conflictPage.text(), /REFERENCE_CONFLICT/);
+  const deletedBrand = await submit(
+    "/admin/references/brands",
+    { confirmDelete: "yes" }, adminCookie, 'value="reference-delete-12121212-1212-4212-8212-121212121212"',
+  );
+  assert.equal(deletedBrand.status, 303);
+  assert.equal(adminBrands.some((item) => item.slug === "test-maker"), false);
+  const categoriesManager = await fetch(`${base}/admin/references/categories`, { headers: { Cookie: adminCookie } });
+  assert.match(await categoriesManager.text(), /Parent category/);
+  const groupsManager = await fetch(`${base}/admin/references/specification-groups`, { headers: { Cookie: adminCookie } });
+  assert.match(await groupsManager.text(), /Core specifications/);
+  const definitionsManager = await fetch(`${base}/admin/references/specification-definitions`, { headers: { Cookie: adminCookie } });
+  const definitionsHtml = await definitionsManager.text();
+  assert.match(definitionsHtml, /Feature enabled/);
+  assert.match(definitionsHtml, /Comparable/);
+  const unknownManager = await fetch(`${base}/admin/references/not-a-resource`, { headers: { Cookie: adminCookie } });
+  assert.equal(unknownManager.status, 404);
 
   const logout = await submit("/admin", {}, adminCookie);
   assert.equal(logout.status, 303);

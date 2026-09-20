@@ -11,7 +11,7 @@ import {
 } from "@/lib/admin-api";
 import { adminFailureState, type AdminActionState } from "@/lib/admin-action-state";
 import type { SpecificationDataType } from "@/lib/admin-contracts";
-import { AdminFormError, parseDeviceForm, parseSpecificationForm } from "@/lib/admin-form-data";
+import { AdminFormError, parseDeviceForm, parseSpecificationForm, retainDeviceFormValues } from "@/lib/admin-form-data";
 import { clearAdminSession, readAdminSession } from "@/lib/admin-session";
 
 async function apiKey(): Promise<string> {
@@ -28,12 +28,21 @@ async function failure(result: Extract<AdminResult<unknown>, { ok: false }>): Pr
   return adminFailureState(result);
 }
 
-function formFailure(error: unknown): NonNullable<AdminActionState> {
+function formFailure(error: unknown, values?: Record<string, string>): NonNullable<AdminActionState> {
   return {
     ok: false,
     code: "VALIDATION_ERROR",
     message: error instanceof AdminFormError ? error.message : "The submitted form could not be read.",
+    ...(values ? { values } : {}),
   };
+}
+
+function operationalErrorPath(id: string | null, result: Extract<AdminResult<unknown>, { ok: false }>): string | null {
+  if (result.status !== 413 && result.status !== 429) return null;
+  const query = new URLSearchParams({ error: result.status === 413 ? "PAYLOAD_TOO_LARGE" : "RATE_LIMITED" });
+  if (result.retryAfterSeconds !== undefined) query.set("retry", String(result.retryAfterSeconds));
+  if (/^[A-Za-z0-9._:-]{1,128}$/.test(result.error.traceId)) query.set("trace", result.error.traceId);
+  return `/admin/devices/${id ?? "new"}?${query}`;
 }
 
 export async function saveDeviceAction(
@@ -41,14 +50,20 @@ export async function saveDeviceAction(
   _previousState: AdminActionState,
   formData: FormData,
 ): Promise<AdminActionState> {
+  const values = retainDeviceFormValues(formData);
   let input;
   try {
     input = parseDeviceForm(formData);
   } catch (error) {
-    return formFailure(error);
+    return formFailure(error, values);
   }
   const result = await adminSaveDevice(await apiKey(), input, id ?? undefined);
-  if (!result.ok) return failure(result);
+  if (!result.ok) {
+    const errorPath = operationalErrorPath(id, result);
+    if (errorPath) redirect(errorPath);
+    const state = await failure(result);
+    return state && !state.ok ? { ...state, values } : state;
+  }
   revalidatePath("/admin/devices");
   redirect(`/admin/devices/${result.data.id}`);
 }

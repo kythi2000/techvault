@@ -26,10 +26,10 @@ export const adminDeviceInputSchema = z.object({
   releaseYear: z.number().int().min(1).max(9999).nullable(),
   releaseDate: dateSchema,
   discontinuedDate: dateSchema,
-  heightMm: z.number().nullable(),
-  widthMm: z.number().nullable(),
-  depthMm: z.number().nullable(),
-  weightGrams: z.number().nullable(),
+  heightMm: z.number().positive().nullable(),
+  widthMm: z.number().positive().nullable(),
+  depthMm: z.number().positive().nullable(),
+  weightGrams: z.number().positive().nullable(),
 });
 
 export const adminDeviceSummarySchema = z.object({
@@ -154,4 +154,3 @@ export type AdminReferenceInput =
   | Omit<AdminCategory, "id">
   | Omit<AdminSpecificationGroup, "id">
   | Omit<AdminSpecificationDefinition, "id">;
-

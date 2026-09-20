@@ -10,6 +10,9 @@ let referencesAvailable = true;
 const discoveryRequests = [];
 const comparisonRequests = [];
 const adminKey = "smoke-admin-key-01234567890123456789";
+let acceptedAdminKey = adminKey;
+let rateLimitAdminReads = false;
+let rateLimitReferenceDeletes = false;
 const adminRequests = [];
 const adminSessionSecret = Buffer.alloc(32, 9).toString("base64");
 const comparisonGroup = { id: "10101010-1010-4010-8010-101010101010", key: "phone", name: "Phones" };
@@ -93,8 +96,12 @@ const api = http.createServer(async (request, response) => {
   if (!available) return error(500, "UNEXPECTED_ERROR");
   if (url.pathname.startsWith("/api/v1/admin/")) {
     adminRequests.push(`${request.method} ${url.pathname}${url.search}`);
-    if (request.headers.authorization !== `Bearer ${adminKey}`) return error(401, "UNAUTHORIZED");
+    if (request.headers.authorization !== `Bearer ${acceptedAdminKey}`) return error(401, "UNAUTHORIZED");
     if (url.pathname === "/api/v1/admin/devices" && request.method === "GET") {
+      if (rateLimitAdminReads) {
+        response.setHeader("Retry-After", "60");
+        return error(429, "RATE_LIMITED");
+      }
       const page = Number(url.searchParams.get("page") ?? 1);
       const pageSize = Number(url.searchParams.get("pageSize") ?? 24);
       const status = url.searchParams.get("status");
@@ -103,6 +110,12 @@ const api = http.createServer(async (request, response) => {
     }
     if (url.pathname === "/api/v1/admin/devices" && request.method === "POST") {
       const content = await readJson();
+      if (content.name === "Rate Limited Device") {
+        response.setHeader("Retry-After", "60");
+        return error(429, "RATE_LIMITED");
+      }
+      if (content.name === "Oversized Device") return error(413, "PAYLOAD_TOO_LARGE");
+      if (content.name === "Conflict Device") return error(409, "CATALOG_CONFLICT");
       const device = { id: "90909090-9090-4090-8090-909090909090", status: "draft", content, createdAt: adminNow, updatedAt: adminNow, publishedAt: null, specifications: [] };
       adminDevices.push(device);
       response.statusCode = 201;
@@ -175,10 +188,17 @@ const api = http.createServer(async (request, response) => {
       if (index < 0) return error(404, "ADMIN_RESOURCE_NOT_FOUND");
       if (request.method === "GET") return response.end(JSON.stringify({ data: values[index] }));
       if (request.method === "PUT") {
-        values[index] = { id: values[index].id, ...await readJson() };
+        const input = await readJson();
+        const immutable = referenceMatch[1] === "brands" || referenceMatch[1] === "categories" ? "slug" : "key";
+        if (input[immutable] !== values[index][immutable]) return error(400, "IMMUTABLE_FIELD");
+        values[index] = { id: values[index].id, ...input };
         return response.end(JSON.stringify({ data: values[index] }));
       }
       if (request.method === "DELETE") {
+        if (rateLimitReferenceDeletes) {
+          response.setHeader("Retry-After", "60");
+          return error(429, "RATE_LIMITED");
+        }
         if (referenceMatch[1] === "brands" && referenceMatch[2] === brand.id) return error(409, "REFERENCE_CONFLICT");
         const [deleted] = values.splice(index, 1);
         return response.end(JSON.stringify({ data: { id: deleted.id } }));
@@ -481,11 +501,28 @@ try {
   assert.match(adminCookie, /HttpOnly/);
   assert.match(adminCookie, /SameSite=Strict/i);
   assert.doesNotMatch((await acceptedLogin.text()) + logs, new RegExp(adminKey));
+  acceptedAdminKey = "rotated-admin-key-012345678901234567";
+  const rejectedSession = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie }, redirect: "manual" });
+  assert.equal(rejectedSession.status, 307);
+  assert.equal(rejectedSession.headers.get("location"), "/admin/login?reauth=1");
+  const reauthentication = await fetch(new URL(rejectedSession.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  const reauthenticationHtml = await reauthentication.text();
+  assert.equal(reauthentication.status, 200);
+  assert.match(reauthenticationHtml, /SESSION_REJECTED/);
+  assert.match(reauthenticationHtml, /Unlock the editorial workspace/);
+  acceptedAdminKey = adminKey;
   const dashboardResponse = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie }, redirect: "manual" });
   assert.equal(dashboardResponse.status, 200);
   const dashboard = await dashboardResponse.text();
   assert.match(dashboard, /Editorial dashboard/);
   assert.match(dashboard, /Devices/);
+  rateLimitAdminReads = true;
+  const rateLimitedRead = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie } });
+  const rateLimitedReadHtml = await rateLimitedRead.text();
+  assert.match(rateLimitedReadHtml, /RATE_LIMITED/);
+  assert.match(rateLimitedReadHtml, /Try again[\s\S]*60[\s\S]*seconds/);
+  assert.match(rateLimitedReadHtml, /Trace:[\s\S]*smoke-trace/);
+  rateLimitAdminReads = false;
 
   const deviceFields = {
     name: "Editorial test device", slug: "editorial-test-device", brandId: brand.id, categoryId: category.id,
@@ -551,6 +588,9 @@ try {
   const archivedHtml = await archivedPage.text();
   assert.match(archivedHtml, /Archived/);
   assert.doesNotMatch(archivedHtml, />Save device</);
+  assert.doesNotMatch(archivedHtml, /value="lifecycle"/);
+  assert.doesNotMatch(archivedHtml, />Save value</);
+  assert.doesNotMatch(archivedHtml, />Remove value</);
   const archivedList = await fetch(`${base}/admin/devices?status=archived`, { headers: { Cookie: adminCookie } });
   assert.match(await archivedList.text(), /Editorial device revised/);
 
@@ -580,6 +620,18 @@ try {
   assert.equal(brandConflict.status, 303);
   const conflictPage = await fetch(new URL(brandConflict.headers.get("location"), base), { headers: { Cookie: adminCookie } });
   assert.match(await conflictPage.text(), /REFERENCE_CONFLICT/);
+  rateLimitReferenceDeletes = true;
+  const rateLimitedDelete = await submit(
+    "/admin/references/brands",
+    { confirmDelete: "yes" }, adminCookie, 'value="reference-delete-12121212-1212-4212-8212-121212121212"',
+  );
+  assert.equal(rateLimitedDelete.status, 303);
+  const rateLimitedDeletePage = await fetch(new URL(rateLimitedDelete.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  const rateLimitedDeleteHtml = await rateLimitedDeletePage.text();
+  assert.match(rateLimitedDeleteHtml, /RATE_LIMITED/);
+  assert.match(rateLimitedDeleteHtml, /Try again[\s\S]*60[\s\S]*seconds/);
+  assert.match(rateLimitedDeleteHtml, /smoke-trace/);
+  rateLimitReferenceDeletes = false;
   const deletedBrand = await submit(
     "/admin/references/brands",
     { confirmDelete: "yes" }, adminCookie, 'value="reference-delete-12121212-1212-4212-8212-121212121212"',
@@ -594,8 +646,55 @@ try {
   const definitionsHtml = await definitionsManager.text();
   assert.match(definitionsHtml, /Feature enabled/);
   assert.match(definitionsHtml, /Comparable/);
+  const referenceCases = [
+    {
+      kind: "categories", list: adminCategories,
+      create: { name: "Test category", slug: "test-category", description: "Created.", displayOrder: "20", parentCategoryId: "" },
+      update: { name: "Test category revised", slug: "test-category", description: "Updated.", displayOrder: "21", parentCategoryId: "" },
+    },
+    {
+      kind: "specification-groups", list: adminGroups,
+      create: { name: "Test group", key: "test_group", displayOrder: "20" },
+      update: { name: "Test group revised", key: "test_group", displayOrder: "21" },
+    },
+    {
+      kind: "specification-definitions", list: adminDefinitions,
+      create: { name: "Test definition", key: "test_definition", groupId: adminGroups[0].id, dataType: "text", displayOrder: "30", unit: "", isComparable: "true" },
+      update: { name: "Test definition revised", key: "test_definition", groupId: adminGroups[0].id, dataType: "text", displayOrder: "31", unit: "", isComparable: "true" },
+    },
+  ];
+  for (const referenceCase of referenceCases) {
+    const referencePath = `/admin/references/${referenceCase.kind}`;
+    const created = await submit(referencePath, referenceCase.create, adminCookie, 'value="reference-create"');
+    assert.equal(created.status, 303);
+    assert.ok(referenceCase.list.some((item) => item.id === "12121212-1212-4212-8212-121212121212"));
+    const updated = await submit(referencePath, referenceCase.update, adminCookie, 'value="reference-edit-12121212-1212-4212-8212-121212121212"');
+    assert.equal(updated.status, 303);
+    assert.equal(referenceCase.list.find((item) => item.id === "12121212-1212-4212-8212-121212121212").name, referenceCase.update.name);
+    const deleted = await submit(referencePath, { confirmDelete: "yes" }, adminCookie, 'value="reference-delete-12121212-1212-4212-8212-121212121212"');
+    assert.equal(deleted.status, 303);
+    assert.equal(referenceCase.list.some((item) => item.id === "12121212-1212-4212-8212-121212121212"), false);
+  }
   const unknownManager = await fetch(`${base}/admin/references/not-a-resource`, { headers: { Cookie: adminCookie } });
   assert.equal(unknownManager.status, 404);
+  const rateLimitedAdmin = await submit(
+    "/admin/devices/new", { ...deviceFields, name: "Rate Limited Device", slug: "rate-limited-device" }, adminCookie, 'value="device-editor"',
+  );
+  assert.equal(rateLimitedAdmin.status, 303);
+  const rateLimitedAdminPage = await fetch(new URL(rateLimitedAdmin.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  const rateLimitedAdminHtml = await rateLimitedAdminPage.text();
+  assert.match(rateLimitedAdminHtml, /RATE_LIMITED/);
+  assert.match(rateLimitedAdminHtml, /Try again[\s\S]*60[\s\S]*seconds/);
+  const oversizedAdmin = await submit(
+    "/admin/devices/new", { ...deviceFields, name: "Oversized Device", slug: "oversized-device" }, adminCookie, 'value="device-editor"',
+  );
+  assert.equal(oversizedAdmin.status, 303);
+  const oversizedAdminPage = await fetch(new URL(oversizedAdmin.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  assert.match(await oversizedAdminPage.text(), /PAYLOAD_TOO_LARGE/);
+  const securedResponse = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie } });
+  assert.equal(securedResponse.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(securedResponse.headers.get("x-frame-options"), "DENY");
+  assert.equal(securedResponse.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
 
   const logout = await submit("/admin", {}, adminCookie);
   assert.equal(logout.status, 303);
@@ -610,7 +709,8 @@ try {
   assert.match(await html("/timeline"), /These records are temporarily unavailable/);
   assert.match(await html("/"), /The collection cannot be loaded right now/);
   assert.doesNotMatch(logs, /TypeError|ReferenceError|SyntaxError/);
-  console.log("PASS: SSR, search relevance, timeline chronology/filters, mixed catalog, URL pagination, metadata, typed specs, HTTP 404 and failure states.");
+  assert.doesNotMatch(logs, new RegExp(adminKey));
+  console.log("PASS: public SSR/discovery/comparison plus protected admin session, device lifecycle/specifications, reference CRUD, operational errors, and safe headers.");
 } finally {
   if (web.exitCode === null) {
     const stopped = once(web, "exit");

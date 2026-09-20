@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminPagination } from "@/components/admin/admin-pagination";
+import { AdminErrorMessage } from "@/components/admin/admin-error-message";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { adminListDevices } from "@/lib/admin-api";
 import type { AdminStatus } from "@/lib/admin-contracts";
@@ -23,7 +24,7 @@ export default async function AdminDevicesPage({ searchParams }: PageProps<"/adm
   const status = statuses.includes(rawStatus as AdminStatus) ? rawStatus as AdminStatus : undefined;
   const page = one(query.page) ?? "1";
   const result = await adminListDevices(session.apiKey, { page, pageSize: "24", status });
-  if (!result.ok && result.status === 401) redirect("/admin/login");
+  if (!result.ok && result.status === 401) redirect("/admin/login?reauth=1");
 
   return (
     <AdminShell>
@@ -38,7 +39,7 @@ export default async function AdminDevicesPage({ searchParams }: PageProps<"/adm
         </nav>
 
         {!result.ok ? (
-          <div className="admin-banner admin-banner-error" role="alert"><strong>{result.error.code}</strong><span>{result.error.message}</span><small>Trace: {result.error.traceId}</small></div>
+          <AdminErrorMessage code={result.error.code} message={result.error.message} traceId={result.error.traceId} retryAfterSeconds={result.retryAfterSeconds} />
         ) : result.data.data.length === 0 ? (
           <div className="admin-empty"><h2>No devices in this view</h2><p>Choose another status or create a new draft.</p></div>
         ) : (

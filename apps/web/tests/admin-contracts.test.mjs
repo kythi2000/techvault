@@ -9,6 +9,8 @@ import {
   parseDeviceForm,
   parseReferenceForm,
   parseSpecificationForm,
+  retainDeviceFormValues,
+  retainReferenceFormValues,
 } from "../src/lib/admin-form-data.ts";
 import { paged } from "./fixtures.mjs";
 
@@ -39,7 +41,7 @@ const deviceInput = {
   heightMm: 0.125,
   widthMm: null,
   depthMm: null,
-  weightGrams: 0,
+  weightGrams: 1.5,
 };
 
 const detail = {
@@ -83,21 +85,23 @@ test("typed specification form preserves false and zero", () => {
 });
 
 test("device form creates a full replacement contract and keeps unknown values null", () => {
-  const parsed = parseDeviceForm(form({
+  const submitted = {
     name: " Editorial device ", slug: "editorial-device", brandId: ids.brand, categoryId: ids.category,
     comparisonGroupId: "", shortDescription: "Summary", description: "Overview", history: "History",
     seoTitle: "Title", seoDescription: "SEO", modelNumber: "", aliases: " First name\n\nSecond name ",
     releaseYear: "2000", releaseDate: "", discontinuedDate: "", heightMm: "0.125", widthMm: "",
-    depthMm: "", weightGrams: "0",
-  }));
+    depthMm: "", weightGrams: "1.5",
+  };
+  const parsed = parseDeviceForm(form(submitted));
 
   assert.deepEqual(parsed, {
     name: "Editorial device", slug: "editorial-device", brandId: ids.brand, categoryId: ids.category,
     comparisonGroupId: null, shortDescription: "Summary", description: "Overview", history: "History",
     seoTitle: "Title", seoDescription: "SEO", modelNumber: null, aliases: ["First name", "Second name"],
     releaseYear: 2000, releaseDate: null, discontinuedDate: null, heightMm: 0.125, widthMm: null,
-    depthMm: null, weightGrams: 0,
+    depthMm: null, weightGrams: 1.5,
   });
+  assert.throws(() => parseDeviceForm(form({ ...submitted, heightMm: "0" })), /greater than zero/i);
 });
 
 test("reference parser returns only fields allowed for its closed resource kind", () => {
@@ -109,6 +113,21 @@ test("reference parser returns only fields allowed for its closed resource kind"
     { name: "Weight", key: "weight", groupId: ids.definition, dataType: "number", displayOrder: 20, unit: "g", isComparable: true },
   );
   assert.throws(() => parseReferenceForm("../../devices", form({})), /Unsupported admin resource/);
+});
+
+test("failed editor submissions retain only allowlisted form values", () => {
+  const device = form({ name: " Untrimmed editor value ", slug: "draft", apiKey: "must-not-survive" });
+  assert.deepEqual(retainDeviceFormValues(device), {
+    name: " Untrimmed editor value ", slug: "draft", brandId: "", categoryId: "", comparisonGroupId: "",
+    modelNumber: "", shortDescription: "", description: "", history: "", seoTitle: "", seoDescription: "",
+    aliases: "", releaseYear: "", releaseDate: "", discontinuedDate: "", heightMm: "", widthMm: "",
+    depthMm: "", weightGrams: "",
+  });
+
+  const reference = form({ name: "Comparable field", key: "field", isComparable: "true", injectedPath: "/devices" });
+  assert.deepEqual(retainReferenceFormValues("specification-definitions", reference), {
+    name: "Comparable field", key: "field", groupId: "", dataType: "", displayOrder: "", unit: "", isComparable: "true",
+  });
 });
 
 test("admin adapter sends bearer server-side and returns retry metadata without leaking it", async (t) => {
@@ -128,6 +147,17 @@ test("admin adapter sends bearer server-side and returns retry metadata without 
   assert.doesNotMatch(JSON.stringify(result), /secret-value/);
 });
 
+test("admin adapter rejects a normalized but invalid Retry-After date", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(
+    { error: { code: "RATE_LIMITED", message: "Too many requests; retry later.", traceId: "admin-rate" } },
+    { status: 429, headers: { "Retry-After": "Sun, 31 Feb 2026 12:00:00 GMT" } },
+  ));
+
+  const result = await adminListDevices("secret-value", { page: "1" });
+  assert.equal(result.status, 429);
+  assert.equal(result.retryAfterSeconds, undefined);
+});
+
 test("admin adapter validates complete device detail responses", async (t) => {
   let response = () => Response.json({ data: detail });
   t.mock.method(globalThis, "fetch", async () => response());
@@ -135,7 +165,7 @@ test("admin adapter validates complete device detail responses", async (t) => {
   const valid = await adminGetDevice("secret", ids.device);
   assert.equal(valid.ok, true);
   assert.equal(valid.data.specifications[0].valueBoolean, false);
-  assert.equal(valid.data.content.weightGrams, 0);
+  assert.equal(valid.data.content.weightGrams, 1.5);
 
   response = () => Response.json({ data: { ...detail, specifications: [{ ...detail.specifications[0], valueBoolean: null }] } });
   const malformed = await adminGetDevice("secret", ids.device);

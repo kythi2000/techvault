@@ -11,6 +11,34 @@ export class AdminFormError extends Error {
   }
 }
 
+const deviceFields = [
+  "name", "slug", "brandId", "categoryId", "comparisonGroupId", "modelNumber", "shortDescription",
+  "description", "history", "seoTitle", "seoDescription", "aliases", "releaseYear", "releaseDate",
+  "discontinuedDate", "heightMm", "widthMm", "depthMm", "weightGrams",
+] as const;
+
+const referenceFields: Record<string, readonly string[]> = {
+  brands: ["name", "slug", "description"],
+  categories: ["name", "slug", "description", "displayOrder", "parentCategoryId"],
+  "specification-groups": ["name", "key", "displayOrder"],
+  "specification-definitions": ["name", "key", "groupId", "dataType", "displayOrder", "unit", "isComparable"],
+};
+
+function retainValues(formData: FormData, fields: readonly string[]): Record<string, string> {
+  return Object.fromEntries(fields.map((name) => {
+    const value = formData.get(name);
+    return [name, typeof value === "string" ? value : ""];
+  }));
+}
+
+export function retainDeviceFormValues(formData: FormData): Record<string, string> {
+  return retainValues(formData, deviceFields);
+}
+
+export function retainReferenceFormValues(kind: string, formData: FormData): Record<string, string> {
+  return retainValues(formData, referenceFields[kind] ?? []);
+}
+
 function text(formData: FormData, name: string): string {
   const value = formData.get(name);
   if (typeof value !== "string") throw new AdminFormError(`${name} is required.`);
@@ -38,6 +66,12 @@ function requiredNumber(formData: FormData, name: string, integer = false): numb
   return value;
 }
 
+function positiveNumberValue(formData: FormData, name: string): number | null {
+  const value = numberValue(formData, name);
+  if (value !== null && value <= 0) throw new AdminFormError(`${name} must be greater than zero.`);
+  return value;
+}
+
 export function parseDeviceForm(formData: FormData): AdminDeviceInput {
   return {
     name: text(formData, "name"),
@@ -55,10 +89,10 @@ export function parseDeviceForm(formData: FormData): AdminDeviceInput {
     releaseYear: numberValue(formData, "releaseYear", true),
     releaseDate: nullableText(formData, "releaseDate"),
     discontinuedDate: nullableText(formData, "discontinuedDate"),
-    heightMm: numberValue(formData, "heightMm"),
-    widthMm: numberValue(formData, "widthMm"),
-    depthMm: numberValue(formData, "depthMm"),
-    weightGrams: numberValue(formData, "weightGrams"),
+    heightMm: positiveNumberValue(formData, "heightMm"),
+    widthMm: positiveNumberValue(formData, "widthMm"),
+    depthMm: positiveNumberValue(formData, "depthMm"),
+    weightGrams: positiveNumberValue(formData, "weightGrams"),
   };
 }
 
@@ -133,4 +167,3 @@ export function parseReferenceForm(kind: string, formData: FormData): AdminRefer
       throw new AdminFormError("Unsupported admin resource.");
   }
 }
-

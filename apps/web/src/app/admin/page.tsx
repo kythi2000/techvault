@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminErrorMessage } from "@/components/admin/admin-error-message";
 import { adminListDevices } from "@/lib/admin-api";
 import { requireAdminSession } from "@/lib/admin-session";
 
@@ -15,7 +16,7 @@ const sections = [
 export default async function AdminDashboardPage() {
   const session = await requireAdminSession();
   const check = await adminListDevices(session.apiKey, { page: "1", pageSize: "1" });
-  if (!check.ok && check.status === 401) redirect("/admin/login");
+  if (!check.ok && check.status === 401) redirect("/admin/login?reauth=1");
 
   return (
     <AdminShell>
@@ -28,13 +29,7 @@ export default async function AdminDashboardPage() {
           <p>Choose a collection to edit. Every save is validated against the active backend contract.</p>
         </header>
 
-        {!check.ok && (
-          <div className="admin-banner admin-banner-error" role="alert">
-            <strong>{check.error.code}</strong>
-            <span>{check.error.message}</span>
-            <small>Trace: {check.error.traceId}</small>
-          </div>
-        )}
+        {!check.ok && <AdminErrorMessage code={check.error.code} message={check.error.message} traceId={check.error.traceId} retryAfterSeconds={check.retryAfterSeconds} />}
 
         <nav className="admin-dashboard-grid" aria-label="Editorial sections">
           {sections.map((section) => (

@@ -34,7 +34,8 @@ function SpecificationRow({ deviceId, definition, value }: {
       <form action={saveAction} className="admin-spec-form">
         <input type="hidden" name="definitionId" value={definition.id} />
         {definition.dataType === "boolean" ? (
-          <select name={fieldName} defaultValue={currentValue(definition, value)} aria-label={`${definition.name} value`}>
+          <select name={fieldName} defaultValue={currentValue(definition, value)} aria-label={`${definition.name} value`} required>
+            <option value="" disabled>Select true or false</option>
             <option value="true">True</option><option value="false">False</option>
           </select>
         ) : (

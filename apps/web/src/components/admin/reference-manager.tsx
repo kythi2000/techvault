@@ -28,21 +28,22 @@ function value(item: AdminReference | undefined, name: string): string | number 
   return typeof current === "string" || typeof current === "number" || typeof current === "boolean" ? current : "";
 }
 
-function ReferenceControl({ field, item, categories, groups }: {
+function ReferenceControl({ field, item, categories, groups, submitted }: {
   field: AdminReferenceField;
   item?: AdminReference;
   categories: AdminCategory[];
   groups: AdminSpecificationGroup[];
+  submitted?: Record<string, string>;
 }) {
   const immutable = Boolean(item && field.immutable);
-  const current = value(item, field.name);
+  const current = submitted ? submitted[field.name] ?? "" : value(item, field.name);
   const name = immutable ? undefined : field.name;
   let control;
 
   if (field.control === "textarea") {
     control = <textarea name={name} rows={4} required={field.required} disabled={immutable} defaultValue={String(current)} />;
   } else if (field.control === "checkbox") {
-    control = <input name={name} type="checkbox" value="true" disabled={immutable} defaultChecked={current === true} />;
+    control = <input name={name} type="checkbox" value="true" disabled={immutable} defaultChecked={current === true || current === "true" || current === "on"} />;
   } else if (field.control === "category" || field.control === "group" || field.control === "dataType") {
     const options = field.control === "category"
       ? categories.filter((category) => category.id !== record(item).id).map((category) => ({ value: category.id, label: category.name }))
@@ -79,11 +80,13 @@ function ReferenceForm({ kind, item, categories, groups }: {
   const action = saveReferenceAction.bind(null, kind, item?.id ?? null);
   const [state, formAction, pending] = useActionState(action, null, `/admin/references/${kind}`);
   const marker = item ? `reference-edit-${item.id}` : "reference-create";
+  const submitted = state && !state.ok ? state.values : undefined;
+  const formKey = submitted ? JSON.stringify(submitted) : "initial";
   return (
-    <form action={formAction} className="admin-reference-form">
+    <form action={formAction} className="admin-reference-form" key={formKey}>
       <input type="hidden" name="formKind" value={marker} />
       <div className="admin-reference-fields">
-        {config.fields.map((field) => <ReferenceControl key={field.name} field={field} item={item} categories={categories} groups={groups} />)}
+        {config.fields.map((field) => <ReferenceControl key={field.name} field={field} item={item} categories={categories} groups={groups} submitted={submitted} />)}
       </div>
       <AdminActionMessage state={state} />
       <button className={`admin-button ${item ? "" : "admin-button-primary"}`} type="submit" disabled={pending}>

@@ -58,9 +58,11 @@ function parseRetryAfter(response: Response): number | undefined {
     const seconds = Number(value);
     return Number.isSafeInteger(seconds) ? seconds : undefined;
   }
+  if (!/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value)) return undefined;
   const date = Date.parse(value);
-  if (!Number.isFinite(date)) return undefined;
-  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+  if (!Number.isFinite(date) || new Date(date).toUTCString() !== value) return undefined;
+  const seconds = Math.max(0, Math.ceil((date - Date.now()) / 1000));
+  return Number.isSafeInteger(seconds) ? seconds : undefined;
 }
 
 async function adminRequest<T>(

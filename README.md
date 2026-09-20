@@ -1,6 +1,6 @@
 # TechVault
 
-A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–9 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, a chronological timeline, two-device comparisons, protected content management, and production-readiness controls. The Next.js app covers public Frontend Phases 1–6 in [the frontend specification](docs/FRONTEND_SPEC.md): the visual foundation, browse/detail/taxonomy routes, search, a responsive timeline, and structured comparison.
+A digital museum and phone/computer catalog. The .NET backend currently covers Phases 1–9 in [the backend roadmap](docs/BACKEND_ROADMAP.md), including a four-device phone/computer seed, public catalog APIs, PostgreSQL full-text search, a chronological timeline, two-device comparisons, protected content management, and production-readiness controls. The Next.js app covers public Frontend Phases 1–6 plus the protected Phase 8 editorial CMS and relevant Phase 9 operational UX in [the frontend specification](docs/FRONTEND_SPEC.md).
 
 ## Frontend
 
@@ -15,6 +15,8 @@ npm run dev
 Open `http://localhost:3000`. `TECHVAULT_API_URL` defaults to `http://localhost:5078`; see [the web README](apps/web/README.md) for configuration and quality checks. When the catalog API is unavailable, the public shell still renders and data surfaces show an explicit unavailable state.
 
 With the current migrations applied and the API running, open `/search?q=Nokia`, `/timeline?era=1990s`, or `/compare?devices=nokia-3310,nokia-3210`. Discovery and comparison keep their state in shareable URLs.
+
+The private CMS starts at `/admin`. Give the API process its `Admin__ApiKey`, give the Next.js process a separate `TECHVAULT_ADMIN_SESSION_SECRET` that is base64 for exactly 32 random bytes, then enter the API key once on `/admin/login`. Detailed setup, security boundaries, and route coverage are in the [web README](apps/web/README.md).
 
 ## Local build and run
 
@@ -232,7 +234,7 @@ dotnet run --project apps/api/src/TechVault.Api --launch-profile http
 
 Keep the key in a private secret store if it must survive this session. A trusted client must use the same key; generating another key in a second terminal will not authenticate against the running process. Use HTTPS outside loopback development, never query-string credentials or a public frontend bundle. Rotate by replacing the configured key and restarting the API. See [the admin API contract](docs/api/ADMIN.md) for setup, request bodies, lifecycle rules, and errors; [TechVault.Admin.http](apps/api/src/TechVault.Api/TechVault.Admin.http) contains examples using a private client variable.
 
-Phase 8 adds FluentValidation with manual validation in concrete Application handlers and domain methods for editing/lifecycle rules. It reuses the current schema: no new migration, account table, JWT server, repository, Unit of Work, MediatR, media pipeline, or admin UI. Apply existing migrations through `AddCatalogComparisons` explicitly if your database is behind; startup still never migrates or seeds. PUT replaces the documented content fields; use GET to load the current content before editing. Writes are immediate and intended for one trusted editor, not a multi-user approval/versioning workflow.
+Backend Phase 8 adds FluentValidation with manual validation in concrete Application handlers and domain methods for editing/lifecycle rules. It reuses the current schema: no new migration, account table, JWT server, repository, Unit of Work, MediatR, or media pipeline. The separate Next.js app now provides the trusted single-editor UI over these endpoints; it does not change the backend authentication model. Apply existing migrations through `AddCatalogComparisons` explicitly if your database is behind; startup still never migrates or seeds. PUT replaces the documented content fields; use GET to load the current content before editing. Writes are immediate and are not a multi-user approval/versioning workflow.
 
 ```sh
 dotnet build apps/api/TechVault.slnx

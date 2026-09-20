@@ -124,6 +124,29 @@ test("comparison adapter retains rate limit retry metadata", async (t) => {
   assert.equal(result.error.traceId, "rate-trace");
 });
 
+test("public adapter drops unsafe Retry-After values", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(
+    { error: { code: "RATE_LIMITED", message: "Too many requests; retry later.", traceId: "rate-trace" } },
+    { status: 429, headers: { "Retry-After": "999999999999999999999999", "X-Trace-Id": "rate-trace" } },
+  ));
+
+  const result = await compareDevices({ devices: "nokia-3310,nokia-3210" });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 429);
+  assert.equal(result.retryAfterSeconds, undefined);
+});
+
+test("public adapter rejects a normalized but invalid Retry-After date", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(
+    { error: { code: "RATE_LIMITED", message: "Too many requests; retry later.", traceId: "rate-trace" } },
+    { status: 429, headers: { "Retry-After": "Sun, 31 Feb 2026 12:00:00 GMT" } },
+  ));
+
+  const result = await compareDevices({ devices: "nokia-3310,nokia-3210" });
+  assert.equal(result.status, 429);
+  assert.equal(result.retryAfterSeconds, undefined);
+});
+
 test("all-device picker follows public pagination in API order", async (t) => {
   let call = 0;
   t.mock.method(globalThis, "fetch", async () => {

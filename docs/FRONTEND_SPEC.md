@@ -1,8 +1,8 @@
 # TechVault Frontend Specification
 
 Status: working specification  
-Scope: public web application in `apps/web`  
-Last updated: 2026-09-19
+Scope: public web application and private single-editor CMS in `apps/web`
+Last updated: 2026-09-20
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ The frontend turns the public catalog API into two connected experiences:
 1. **Archive utility** — find a device, inspect its technical record, and move between brands, categories, and eras.
 2. **Digital museum** — understand why an object mattered through editorial context and deliberate visual presentation.
 
-The public frontend consumes Backend Phases 1–7, including the four-device catalog, search/timeline, and structured two-device comparison. Media and collections still depend on future backend contracts. Backend Phase 8 now supplies the protected content-management contract for the next frontend slice.
+The public frontend consumes Backend Phases 1–7, including the four-device catalog, search/timeline, and structured two-device comparison. The private CMS consumes Backend Phase 8 and maps relevant Backend Phase 9 transport/error controls into editorial recovery states. Media and collections still depend on future backend contracts.
 
 ## 2. Product principles
 
@@ -61,7 +61,9 @@ Archive → exact technical record → verify unknown values → later compare/t
 | `/timeline` | Global/phone/computer/brand chronology via URL filters | Dynamic SSR + client scroll controls | `GET /timeline`, `/brands`, `/categories` | Implemented |
 | `/compare` | Ordered two-device comparison with URL state | Dynamic SSR + client selection | `GET /compare` | Implemented |
 | `/museum`, `/collections/*` | Curated stories | ISR | Future content APIs | Phase 7 |
-| `/admin/*` | Editorial CMS | Client-heavy, protected | Backend Phase 8 | Phase 8 |
+| `/admin/login`, `/admin` | Editor authentication and workspace index | Dynamic SSR + Server Actions | Backend Phase 8 | Implemented |
+| `/admin/devices`, `/admin/devices/new`, `/admin/devices/{id}` | Device content, lifecycle, and typed specifications | Dynamic SSR + Server Actions | Backend Phases 8–9 | Implemented |
+| `/admin/references/{kind}` | CRUD for four mutable reference resources | Dynamic SSR + Server Actions | Backend Phases 8–9 | Implemented |
 
 `/devices/{slug}/specs` uses the detail endpoint for now because it already contains the same ordered specification groups. The dedicated specifications endpoint remains available if payload separation becomes useful later.
 
@@ -106,9 +108,9 @@ Until Media APIs exist, device art is explicitly labeled as an archival placehol
 - Server Components by default
 - TanStack Query only when interactive client-owned data is introduced
 - Zustand only for genuinely cross-route transient state such as a future compare tray
-- React Hook Form for future admin forms
+- Native forms and React 19 `useActionState` for current admin workflows
 
-TanStack Query, Zustand, and React Hook Form are intentionally not installed in the first public server-rendered slices. Adding unused global providers increases client JavaScript and creates a second cache without solving a current problem.
+TanStack Query, Zustand, and React Hook Form remain intentionally uninstalled. Server Components own reads and Server Actions own writes; native form parsing and backend validation cover the current single-editor workflows without a second client cache or form abstraction.
 
 ### Folder ownership
 
@@ -158,6 +160,18 @@ The UI exposes brand, category, decade, and sort, with type, year/range, and pag
 - Timeline preserves API order: release year, exact release date (unknown last), then slug. A year-only record displays an unknown exact date; FE never invents January 1. The timeline schema rejects a missing release year.
 - Timeline cards are server-rendered in a horizontally scrollable region on desktop and a vertical sequence on mobile. A small client component adds Earlier/Later buttons, tracks scroll limits, and honors reduced motion; native scrolling, keyboard access, filters, and pagination work without client state libraries.
 - On taxonomy API failure, current selected values remain in filter controls and a notice is shown. Discovery data can still render independently.
+
+### Admin session and mutations
+
+- `/admin/login` sends the API key to a same-origin Server Action. The browser never calls the ASP.NET admin API directly.
+- Next.js verifies the key with a minimal authenticated read, encrypts it with AES-256-GCM, and stores only the encrypted token in an eight-hour `HttpOnly`, `SameSite=Strict` cookie. `TECHVAULT_ADMIN_SESSION_SECRET` is server-only base64 for exactly 32 bytes.
+- Every protected Server Component and Server Action independently opens the session. Missing, expired, corrupt, or unauthorized sessions fail closed and return to login.
+- A backend `401` from a cryptographically valid session enters an explicit re-authentication route, so API-key rotation cannot trap the editor in a login redirect loop.
+- Admin adapters use explicit methods and a four-value reference-resource union. Browser fields cannot select an arbitrary backend URL or HTTP method.
+- Device PUT is a full replacement; lifecycle and typed specification operations remain separate. `false` and `0` serialize as present values. Archived records expose no write controls.
+- Reference editing includes immutable values in full PUT bodies while disabling those controls. Deletion requires confirmation and surfaces reference conflicts without cascade behavior.
+- Validation and conflict action states retain only allowlisted submitted fields and remount hydrated forms with those values; the admin workspace requires JavaScript for this inline recovery path.
+- `401`, `409`, `413`, and `429` remain structured. Rate limits preserve safe `Retry-After` seconds, payload limits use concise recovery copy, and trace IDs remain visible without echoing request content.
 
 ### Runtime validation
 
@@ -259,6 +273,8 @@ Initial budgets:
 - Avoid layout shift by reserving object/media aspect ratios.
 - Forward no browser credentials to the public API.
 - Never place admin secrets in `NEXT_PUBLIC_*` variables.
+- Never place the admin API key in a URL, public bundle, `localStorage`, logs, or tracked environment file.
+- Admin and public responses set `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`.
 - Render editorial text as text; do not use unsanitized `dangerouslySetInnerHTML`.
 
 Target production checks: LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms at the 75th percentile on representative mobile traffic.
@@ -285,11 +301,11 @@ Target production checks: LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms at the 75th
 - Playwright journeys against a seeded disposable API;
 - automated accessibility checks and mobile/desktop screenshot regression.
 
-### Verification snapshot — 2026-09-18
+### Verification snapshot — 2026-09-20
 
 - Lint, generated route types, strict TypeScript, unit/contract tests, production build, and HTTP smoke suite pass.
 - Browser-driven visual/console inspection is still required before release; the current Codex browser runtime could not initialize because its sandbox policy metadata was unavailable.
-- The Phase 5 HTTP smoke suite uses a temporary contract-compatible API with synthetic mixed-catalog records. A live API was not listening on the default local port during verification; end-to-end checks against the migrated/seeded database remain a local integration check.
+- The HTTP smoke suite uses a temporary stateful contract-compatible API with synthetic mixed-catalog and admin records. It covers login/logout and rotated-key re-authentication, cookie flags, device create/update/lifecycle/specifications and archived controls, CRUD for all four reference resources, conflicts, read/write/delete `429`, `413` recovery, safe headers, and absence of the API key from returned HTML/logs. Unit coverage verifies allowlisted failed-form retention. A live API was not listening on the default local port during verification; end-to-end checks against the migrated/seeded database remain a local integration check.
 
 ## 14. Delivery phases
 
@@ -335,15 +351,15 @@ Deliver `/museum`, curated collections, era stories, and progressive media treat
 
 Dependency: content/media/collection contracts and licensed assets.
 
-### Phase 8 — Admin CMS
+### Phase 8 — Admin CMS — implemented
 
-Deliver protected, client-heavy editorial workflows using React Hook Form and Zod. Include unsaved-change protection, accessible validation summaries, preview, and publish confirmation.
+Deliver a protected single-editor workspace with an encrypted eight-hour session, contract-validated server-side reads, and allowlisted Server Actions. It covers device list/create/full replacement, publish/unpublish/archive, typed specification save/remove, and CRUD for brands, categories, specification groups, and specification definitions. Comparison groups remain read-only picklist data. Archived devices are read-only; immutable reference metadata is locked after creation; destructive operations require confirmation.
 
-Dependency: Backend Phase 8 authentication and mutation APIs.
+Dependency satisfied by Backend Phase 8 authentication and mutation APIs. Accounts, concurrent approval/version history, media, bulk import, restore, and preview infrastructure remain outside the backend contract and are not simulated by the frontend.
 
-### Phase 9 — SEO, performance, and observability
+### Phase 9 — SEO, performance, and observability — operational baseline implemented
 
-Deliver structured data, sitemap, robots, generated social images, caching/invalidation, Web Vitals reporting, analytics consent decision, and automated accessibility/performance budgets.
+The Backend Phase 9-facing baseline is implemented: safe `413`/`429` recovery with trace/retry metadata, strict parsing of `Retry-After`, noindex admin metadata, and global nosniff/frame/referrer headers. Remaining work is structured data, sitemap, robots, generated social images, caching/invalidation, Web Vitals reporting, analytics consent decision, and automated accessibility/performance budgets.
 
 Dependency: production URL, publish invalidation policy, and complete metadata/media contracts.
 

@@ -9,18 +9,12 @@ public sealed class ApiErrorHandlingMiddleware(RequestDelegate next, ILogger<Api
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.Request.Path.StartsWithSegments("/api/v1"))
-        {
-            await next(context);
-            return;
-        }
-
         var traceId = ApiResponses.TraceId(context);
         context.Response.Headers["X-Trace-Id"] = traceId;
         try
         {
             await next(context);
-            if (!context.Response.HasStarted && context.Response.StatusCode is 404 or 405)
+            if (context.Request.Path.StartsWithSegments("/api/v1") && !context.Response.HasStarted && context.Response.StatusCode is 404 or 405)
             {
                 var notFound = context.Response.StatusCode == 404;
                 await WriteErrorAsync(context, context.Response.StatusCode,
@@ -32,9 +26,11 @@ public sealed class ApiErrorHandlingMiddleware(RequestDelegate next, ILogger<Api
         {
             throw;
         }
-        catch (BadHttpRequestException) when (!context.Response.HasStarted)
+        catch (BadHttpRequestException exception) when (!context.Response.HasStarted)
         {
-            await WriteErrorAsync(context, 400, "VALIDATION_ERROR", "Invalid request parameters.", traceId);
+            var tooLarge = exception.StatusCode == 413;
+            await WriteErrorAsync(context, tooLarge ? 413 : 400, tooLarge ? "PAYLOAD_TOO_LARGE" : "VALIDATION_ERROR",
+                tooLarge ? "Request body exceeds the configured limit." : "Invalid request parameters.", traceId);
         }
         catch (Exception exception) when (!context.Response.HasStarted &&
             context.Request.Path.StartsWithSegments("/api/v1/admin") && CatalogPersistenceErrors.Classify(exception) is { } error)
@@ -43,7 +39,9 @@ public sealed class ApiErrorHandlingMiddleware(RequestDelegate next, ILogger<Api
         }
         catch (Exception exception) when (!context.Response.HasStarted)
         {
-            logger.LogError(exception, "Catalog request failed. TraceId: {TraceId}", traceId);
+            // Exception messages/inner exceptions can contain connection strings, SQL, or request content.
+            logger.LogError("Request failed. ErrorType: {ErrorType}, FailureSite: {FailureSite}, TraceId: {TraceId}",
+                exception.GetType().FullName, exception.TargetSite?.DeclaringType?.FullName, traceId);
             await WriteErrorAsync(context, 500, "UNEXPECTED_ERROR", "An unexpected error occurred.", traceId);
         }
     }

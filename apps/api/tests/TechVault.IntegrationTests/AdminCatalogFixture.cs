@@ -21,7 +21,7 @@ public sealed class AdminCatalogFixture : IAsyncLifetime
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         Factory = Catalog.Factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
             config.AddInMemoryCollection(new Dictionary<string, string?> { ["Admin:ApiKey"] = key })));
-        Client = Factory.CreateClient();
+        Client = Factory.CreateHttpsClient();
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
     }
 

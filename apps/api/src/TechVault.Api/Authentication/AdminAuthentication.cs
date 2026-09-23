@@ -14,6 +14,8 @@ public static class AdminAuthentication
     public const string Scheme = "AdminBearer";
     public const string Policy = "CatalogAdmin";
 
+    public static bool IsValidKey(string? key) => key is { Length: >= 32 and <= 256 } && !key.Any(char.IsWhiteSpace);
+
     public static IServiceCollection AddAdminAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddAuthentication(Scheme).AddScheme<AdminAuthenticationOptions, AdminAuthenticationHandler>(Scheme,
@@ -36,7 +38,7 @@ public sealed class AdminAuthenticationHandler(IOptionsMonitor<AdminAuthenticati
     {
         var expected = Options.ApiKey;
         // Absent/invalid configuration disables admin access; public endpoints remain available.
-        if (expected is null || expected.Length is < 32 or > 256 || expected.Any(char.IsWhiteSpace))
+        if (!AdminAuthentication.IsValidKey(expected))
             return Task.FromResult(AuthenticateResult.NoResult());
         if (!Request.Headers.TryGetValue("Authorization", out var headers) || headers.Count != 1 ||
             !AuthenticationHeaderValue.TryParse(headers[0], out var header) ||
@@ -45,7 +47,7 @@ public sealed class AdminAuthenticationHandler(IOptionsMonitor<AdminAuthenticati
             return Task.FromResult(AuthenticateResult.NoResult());
 
         var valid = CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(candidate)),
-            SHA256.HashData(Encoding.UTF8.GetBytes(expected)));
+            SHA256.HashData(Encoding.UTF8.GetBytes(expected!)));
         if (!valid) return Task.FromResult(AuthenticateResult.Fail("Invalid admin credential."));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, "catalog-admin"), new Claim("role", "catalog-admin")], Scheme.Name));

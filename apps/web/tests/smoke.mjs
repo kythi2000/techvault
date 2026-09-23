@@ -176,6 +176,11 @@ const api = http.createServer(async (request, response) => {
     if (request.method === "POST" && adminLists[url.pathname]) {
       const values = adminLists[url.pathname];
       const input = await readJson();
+      if (input.name === "Rate Limited Reference") {
+        response.setHeader("Retry-After", "60");
+        return error(429, "RATE_LIMITED");
+      }
+      if (input.name === "Oversized Reference") return error(413, "PAYLOAD_TOO_LARGE");
       const item = { id: "12121212-1212-4212-8212-121212121212", ...input };
       values.push(item);
       response.statusCode = 201;
@@ -327,6 +332,10 @@ function actionFields(page, marker) {
 }
 
 async function submit(path, fields, cookie, marker) {
+  return submitPrepared(path, fields, cookie, marker);
+}
+
+async function submitPrepared(path, fields, cookie, marker, beforePost) {
   const pageResponse = await fetch(`${base}${path}`, {
     headers: cookie ? { Cookie: cookie } : {},
     signal: AbortSignal.timeout(15000),
@@ -335,6 +344,7 @@ async function submit(path, fields, cookie, marker) {
   const page = await pageResponse.text();
   const body = new FormData();
   for (const [name, value] of Object.entries({ ...actionFields(page, marker), ...fields })) body.set(name, value);
+  if (beforePost) await beforePost();
   try {
     return await fetch(`${base}${path}`, {
       method: "POST",
@@ -501,6 +511,16 @@ try {
   assert.match(adminCookie, /HttpOnly/);
   assert.match(adminCookie, /SameSite=Strict/i);
   assert.doesNotMatch((await acceptedLogin.text()) + logs, new RegExp(adminKey));
+  const staleAction = await submitPrepared(
+    "/admin/references/brands",
+    { name: "Stale maker", slug: "stale-maker", description: "Loaded before credential rotation." },
+    adminCookie,
+    'value="reference-create"',
+    () => { acceptedAdminKey = "rotated-admin-key-012345678901234567"; },
+  );
+  assert.equal(staleAction.status, 303);
+  assert.equal(staleAction.headers.get("location"), "/admin/login?reauth=1");
+  acceptedAdminKey = adminKey;
   acceptedAdminKey = "rotated-admin-key-012345678901234567";
   const rejectedSession = await fetch(`${base}/admin`, { headers: { Cookie: adminCookie }, redirect: "manual" });
   assert.equal(rejectedSession.status, 307);
@@ -597,6 +617,27 @@ try {
   const brandsPage = await fetch(`${base}/admin/references/brands`, { headers: { Cookie: adminCookie } });
   assert.equal(brandsPage.status, 200);
   assert.match(await brandsPage.text(), /Nokia/);
+  const rateLimitedReference = await submit(
+    "/admin/references/brands",
+    { name: "Rate Limited Reference", slug: "rate-limited-reference", description: "Retry recovery." },
+    adminCookie,
+    'value="reference-create"',
+  );
+  assert.equal(rateLimitedReference.status, 303);
+  const rateLimitedReferencePage = await fetch(new URL(rateLimitedReference.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  const rateLimitedReferenceHtml = await rateLimitedReferencePage.text();
+  assert.match(rateLimitedReferenceHtml, /RATE_LIMITED/);
+  assert.match(rateLimitedReferenceHtml, /Try again[\s\S]*60[\s\S]*seconds/);
+  assert.match(rateLimitedReferenceHtml, /smoke-trace/);
+  const oversizedReference = await submit(
+    "/admin/references/brands",
+    { name: "Oversized Reference", slug: "oversized-reference", description: "Payload recovery." },
+    adminCookie,
+    'value="reference-create"',
+  );
+  assert.equal(oversizedReference.status, 303);
+  const oversizedReferencePage = await fetch(new URL(oversizedReference.headers.get("location"), base), { headers: { Cookie: adminCookie } });
+  assert.match(await oversizedReferencePage.text(), /PAYLOAD_TOO_LARGE/);
   const createdBrand = await submit(
     "/admin/references/brands",
     { name: "Test maker", slug: "test-maker", description: "Created by the admin smoke workflow." },

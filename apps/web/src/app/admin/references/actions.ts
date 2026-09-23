@@ -22,7 +22,7 @@ async function apiKey(): Promise<string> {
 async function failure(result: Extract<AdminResult<unknown>, { ok: false }>): Promise<AdminActionState> {
   if (result.status === 401) {
     await clearAdminSession();
-    redirect("/admin/login");
+    redirect("/admin/login?reauth=1");
   }
   return adminFailureState(result);
 }
@@ -62,6 +62,8 @@ export async function saveReferenceAction(
   }
   const result = await adminSaveReference(await apiKey(), kind, input, id ?? undefined);
   if (!result.ok) {
+    const errorRoute = operationalRoute(kind, result);
+    if (errorRoute) redirect(errorRoute);
     const state = await failure(result);
     return state && !state.ok ? { ...state, values } : state;
   }

@@ -27,7 +27,7 @@ public sealed class AdminAuthenticationTests
     {
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         await using var factory = CreateFactory(key);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateHttpsClient();
         var endpoints = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
             .Where(x => x.RoutePattern.RawText!.StartsWith("/api/v1/admin", StringComparison.Ordinal)).ToArray();
         Assert.Equal(31, endpoints.Length);
@@ -65,7 +65,7 @@ public sealed class AdminAuthenticationTests
     public async Task Missing_or_invalid_configuration_disables_admin_only(string? configuredKey)
     {
         await using var factory = CreateFactory(configuredKey);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateHttpsClient();
         client.DefaultRequestHeaders.Authorization = new("Bearer", configuredKey is { Length: > 0 } ? configuredKey : "anything");
         using var denied = await client.GetAsync("/api/v1/admin/devices", Ct);
         Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
@@ -78,7 +78,7 @@ public sealed class AdminAuthenticationTests
     {
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         await using var factory = CreateFactory(key);
-        using var client = factory.CreateClient();
+        using var client = factory.CreateHttpsClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", key);
         using var invalidPage = await client.GetAsync("/api/v1/admin/devices?page=0", Ct);
         Assert.Equal(HttpStatusCode.BadRequest, invalidPage.StatusCode);
@@ -93,7 +93,7 @@ public sealed class AdminAuthenticationTests
     {
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         await using var factory = CreateFactory(key, "Development");
-        using var client = factory.CreateClient();
+        using var client = factory.CreateHttpsClient();
         using var response = await client.GetAsync("/openapi/v1.json", Ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync(Ct);
@@ -105,7 +105,7 @@ public sealed class AdminAuthenticationTests
         Assert.True(path.GetProperty("post").GetProperty("responses").TryGetProperty("201", out _));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string? key, string environment = "Production") => new WebApplicationFactory<Program>()
+    private static WebApplicationFactory<Program> CreateFactory(string? key, string environment = "Testing") => new TestApiFactory()
         .WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(environment);

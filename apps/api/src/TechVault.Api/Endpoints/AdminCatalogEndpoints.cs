@@ -13,7 +13,7 @@ public static class AdminCatalogEndpoints
     {
         var admin = endpoints.MapGroup("/api/v1/admin").WithTags("Admin")
             .RequireAuthorization(AdminAuthentication.Policy);
-        foreach (var status in new[] { 400, 401, 403, 404, 409 })
+        foreach (var status in new[] { 400, 401, 403, 404, 409, 413, 429 })
             admin.WithMetadata(new ProducesResponseTypeMetadata(status, typeof(ApiErrorResponse), ["application/json"]));
         MapDevices(admin);
         MapBrands(admin);

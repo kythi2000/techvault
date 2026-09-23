@@ -7,17 +7,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using TechVault.Application.Common.Abstractions;
 using TechVault.Infrastructure.Persistence;
-using Testcontainers.PostgreSql;
 
 namespace TechVault.IntegrationTests;
 
 public sealed class PostgreSqlConnectivityTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("techvault_tests")
-        .WithUsername("techvault_tests")
-        .WithPassword(Guid.NewGuid().ToString("N"))
-        .Build();
+    private readonly LocalTestDatabase _postgres = new();
 
     private WebApplicationFactory<Program> _factory = null!;
 
@@ -32,7 +27,7 @@ public sealed class PostgreSqlConnectivityTests : IAsyncLifetime
             Pooling = false
         }.ConnectionString;
 
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        _factory = new TestApiFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, configuration) =>
@@ -46,7 +41,7 @@ public sealed class PostgreSqlConnectivityTests : IAsyncLifetime
     [Fact]
     public async Task DbContext_connects_to_PostgreSQL_without_creating_tables()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateHttpsClient();
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TechVaultDbContext>();
         Assert.Same(db, scope.ServiceProvider.GetRequiredService<ITechVaultDbContext>());
@@ -68,7 +63,7 @@ public sealed class PostgreSqlConnectivityTests : IAsyncLifetime
     [Fact]
     public async Task Readiness_fails_during_database_outage_while_liveness_stays_healthy()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateHttpsClient();
         var cancellationToken = TestContext.Current.CancellationToken;
 
         using var ready = await client.GetAsync("/health/ready", cancellationToken);
@@ -91,7 +86,7 @@ public sealed class PostgreSqlConnectivityTests : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         await _postgres.StopAsync(cancellationToken);
 
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateHttpsClient();
         using var live = await client.GetAsync("/health/live", cancellationToken);
         using var ready = await client.GetAsync("/health/ready", cancellationToken);
 

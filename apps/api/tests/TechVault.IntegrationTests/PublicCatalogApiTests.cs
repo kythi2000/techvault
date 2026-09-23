@@ -239,7 +239,7 @@ public sealed class PublicCatalogApiTests(PublicCatalogFixture fixture) : IClass
         using var production = await fixture.Client.GetAsync("/openapi/v1.json", Ct);
         Assert.Equal(HttpStatusCode.NotFound, production.StatusCode);
         await using var development = fixture.CreateFactory("Development");
-        using var client = development.CreateClient();
+        using var client = development.CreateHttpsClient();
         using var response = await client.GetAsync("/openapi/v1.json", Ct);
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));

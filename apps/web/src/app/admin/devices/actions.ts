@@ -23,7 +23,7 @@ async function apiKey(): Promise<string> {
 async function failure(result: Extract<AdminResult<unknown>, { ok: false }>): Promise<AdminActionState> {
   if (result.status === 401) {
     await clearAdminSession();
-    redirect("/admin/login");
+    redirect("/admin/login?reauth=1");
   }
   return adminFailureState(result);
 }

@@ -4,18 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using TechVault.Infrastructure.Persistence;
 using TechVault.Infrastructure.Persistence.Seed;
-using Testcontainers.PostgreSql;
 
 namespace TechVault.IntegrationTests;
 
 // The real four-device seed, without synthetic browse records or any local database connection.
 public sealed class MixedCatalogFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("techvault_mixed_catalog_tests")
-        .WithUsername("techvault_tests")
-        .WithPassword(Guid.NewGuid().ToString("N"))
-        .Build();
+    private readonly LocalTestDatabase _postgres = new();
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
     public HttpClient Client { get; private set; } = null!;
@@ -34,13 +29,13 @@ public sealed class MixedCatalogFixture : IAsyncLifetime
             await db.Database.MigrateAsync(ct);
             if (seed) await CatalogSeed.SeedAsync(db, ct);
         }
-        Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        Factory = new TestApiFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["DATABASE_URL"] = _postgres.GetConnectionString() }));
         });
-        Client = Factory.CreateClient();
+        Client = Factory.CreateHttpsClient();
     }
 
     public async ValueTask DisposeAsync()

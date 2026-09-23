@@ -13,18 +13,13 @@ using TechVault.Domain.Devices;
 using TechVault.Domain.Specifications;
 using TechVault.Infrastructure.Persistence;
 using TechVault.Infrastructure.Persistence.Seed;
-using Testcontainers.PostgreSql;
 
 namespace TechVault.IntegrationTests;
 
-// Each test gets its own PostgreSQL container. No local/Compose database is used.
+// Each test gets a newly created isolated database on local PostgreSQL, never the application database.
 public sealed class CatalogPersistenceTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("techvault_catalog_tests")
-        .WithUsername("techvault_tests")
-        .WithPassword(Guid.NewGuid().ToString("N"))
-        .Build();
+    private readonly LocalTestDatabase _postgres = new();
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
@@ -303,13 +298,13 @@ public sealed class CatalogPersistenceTests : IAsyncLifetime
     public async Task Migrated_catalog_keeps_health_working_with_public_catalog_endpoints()
     {
         await SeedAsync();
-        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        await using var factory = new TestApiFactory().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["DATABASE_URL"] = _postgres.GetConnectionString() }));
         });
-        using var client = factory.CreateClient();
+        using var client = factory.CreateHttpsClient();
         using var live = await client.GetAsync("/health/live", CancellationToken);
         using var ready = await client.GetAsync("/health/ready", CancellationToken);
         using var catalog = await client.GetAsync("/api/v1/devices/nokia-3310", CancellationToken);

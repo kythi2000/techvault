@@ -16,17 +16,7 @@ public static class DependencyInjection
     {
         services.AddDbContext<TechVaultDbContext>(options =>
         {
-            var connectionString = configuration["DATABASE_URL"];
-
-            Console.WriteLine("Configuring PostgreSQL DbContext.");
-
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new InvalidOperationException(
-                    "Set DATABASE_URL to an Npgsql connection string. See README.md.");
-            }
-
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(DatabaseConfiguration.ForApplication(configuration["DATABASE_URL"]));
         });
 
         services.AddScoped<ITechVaultDbContext>(provider => provider.GetRequiredService<TechVaultDbContext>());
